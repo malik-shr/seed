@@ -3,15 +3,27 @@ module Main exposing (main)
 import Browser
 import Browser.Events
 import Html exposing (Html, div, p, text)
-import Svg exposing (svg, circle, rect)
-import Svg.Attributes exposing (cx, cy, fill, height, r, viewBox, width, x, y)
-import Random
+import Svg exposing (svg, rect)
+import Svg.Attributes exposing (fill, height, viewBox, width, x, y)
 
 import Model exposing (Model)
 import Msg exposing (Msg(..))
 
+import Villager exposing 
+    (Villager
+    , viewVillager
+    , updatePregnancyDuration
+    , giveBirth, ageVillager
+    , moveVillager
+    , villagerGenerator
+    , removeDeadVillagers
+    , pregnancyListGenerator
+    , hasAdultMale
+    )
+
+import Random
+import Task exposing (Task)
 import Utils exposing (tickInYears)
-import Villager exposing (Villager, viewVillager, breedVillager, giveBirth, ageVillager, moveVillager)
 
 
 main : Program () Model Msg
@@ -28,10 +40,13 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { time = 0
       , villagers =
-            [ { x = 80, y = 80, vx = 0.2, vy = 0.1, age = 0, gender = 0, isPregnant = False, pregnantDuration = 0 }
-            , { x = 150, y = 120, vx = -0.3, vy = 0.5, age = 0, gender = 1, isPregnant = False, pregnantDuration = 0 }
+            [ { id = 0, x = 80, y = 80, vx = 0.2, vy = 0.1, age = 0, gender = 0, isPregnant = False, pregnantDuration = 0 }
+            , { id = 1, x = 150, y = 120, vx = -0.3, vy = 0.5, age = 0, gender = 1, isPregnant = False, pregnantDuration = 0 }
             ]
       , tick = 0
+      , nextVillagerId = 0
+      , pregnancyChances = []
+      , newVillager = {id = 3, x = 80, y = 80, vx = 0.2, vy = 0.1, age = 0, gender = 0, isPregnant = False, pregnantDuration = 0}
       }
     , Cmd.none
     )
@@ -46,10 +61,37 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick delta ->
-            ( updateWorld delta model
+            let
+                updatedModel =
+                    updateWorld delta model
+            in
+            ( updatedModel
+            , Cmd.batch
+                [ Random.generate PregnancyCalculated
+                    (pregnancyListGenerator (hasAdultMale updatedModel.villagers) updatedModel.villagers)
+
+                , Random.generate NewVillager
+                    (villagerGenerator updatedModel.nextVillagerId)
+                ]
+            )
+
+        PregnancyCalculated updatedVillagers ->
+            ( { model | villagers = updatedVillagers }
             , Cmd.none
             )
 
+        GenNewVillagerValues ->
+            ( model
+            , Random.generate NewVillager
+                (villagerGenerator model.nextVillagerId)
+            )
+
+        NewVillager newVillager ->
+            ( { model
+                | newVillager = newVillager
+            }
+            , Cmd.none
+            )
 
 updateWorld : Float -> Model -> Model
 updateWorld delta model =
@@ -58,13 +100,15 @@ updateWorld delta model =
             model.villagers
                 |> List.map moveVillager
                 |> List.map ageVillager
-                |> List.map breedVillager
-                |> List.concatMap (giveBirth model.tick)
+                |> List.map updatePregnancyDuration
+                |> List.concatMap (giveBirth model.newVillager)
+                |> removeDeadVillagers
     in
     { model
         | time = model.time + delta
         , tick = model.tick + 1
         , villagers = updatedVillagers
+        , nextVillagerId = List.length model.villagers
     }
 
 
@@ -89,6 +133,7 @@ view model =
                 ++ List.map viewVillager model.villagers
             )
         , p [] [ text ("Tick:" ++ String.fromInt(model.tick))]
+        , p [] [ text ("Year:" ++ String.fromInt(tickInYears model.tick))]
         , p [] [ text ("Villagers:" ++ String.fromInt(List.length model.villagers))]
         ]
 

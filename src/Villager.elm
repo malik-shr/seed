@@ -1,14 +1,33 @@
-module Villager exposing (Villager, viewVillager, breedVillager, giveBirth, ageVillager, moveVillager)
+module Villager exposing 
+    (Villager
+    , viewVillager
+    , updatePregnancyDuration
+    , giveBirth
+    , ageVillager
+    , moveVillager
+    , villagerGenerator
+    , pregnancyGenerator
+    , pregnancyListGenerator
+    , removeDeadVillagers
+    , hasAdultMale
+    )
 
 import Svg exposing (svg, circle, rect)
 import Svg.Attributes exposing (cx, cy, fill, height, r, viewBox, width, x, y)
 
-import Msg exposing (Msg)
-
 import Utils exposing (tickInYears)
 
+import Random
+import Randoms exposing (pseudoRandomInt)
+
+pregnancyChancePerTick : Float
+pregnancyChancePerTick =
+    0.002
+
 type alias Villager =
-    { x : Float
+    { 
+    id : Int
+    ,x : Float
     , y : Float
     , vx : Float
     , vy : Float
@@ -18,86 +37,26 @@ type alias Villager =
     , pregnantDuration : Int 
     }
 
-viewVillager : Villager -> Svg.Svg Msg
-viewVillager villager =
-    let 
-        underaged =
-            if tickInYears villager.age < 18 then
-                True
-            else 
-                False
-    in
+updatePregnancyDuration : Villager -> Villager
+updatePregnancyDuration villager =
+    if villager.isPregnant then
+        { villager | pregnantDuration = villager.pregnantDuration + 1 }
 
-    let
-        color =
-            if villager.gender == 0 then
-                if underaged then
-                    "pink"
-                else 
-                    "red"
-            else
-                if underaged then
-                    "lightblue"
-                else 
-                    "blue"
-    in
+    else
+        villager
 
-    circle
-        [ cx (String.fromFloat villager.x)
-        , cy (String.fromFloat villager.y)
-        , r "6"
-        , fill (color)
-        ]
-        []
-
-breedVillager : Villager -> Villager
-breedVillager villager =
-    let
-        canBecomePregnant =
-            villager.gender == 0
-                && tickInYears villager.age >= 18
-                && tickInYears villager.age <= 45
-                && not villager.isPregnant
-
-        newIsPregnant =
-            villager.isPregnant || canBecomePregnant
-
-        newPregnantDuration =
-            if newIsPregnant then
-                villager.pregnantDuration + 1
-
-            else
-                0
-    in
-    { villager
-        | isPregnant = newIsPregnant
-        , pregnantDuration = newPregnantDuration
-    }
-
-giveBirth : Int -> Villager -> List Villager
-giveBirth tick villager =
-    if villager.isPregnant && tickInYears villager.pregnantDuration >= 5 then
-        [ { villager
+giveBirth : Villager -> Villager -> List Villager
+giveBirth child mother =
+    if mother.isPregnant && tickInYears mother.pregnantDuration >= 1 then
+        [ { mother
             | isPregnant = False
             , pregnantDuration = 0
           }
-        , { x = villager.x
-          , y = villager.y
-          , vx = 0.1
-          , vy = 0.1
-          , age = 0
-          , gender =
-                if modBy 2 tick == 0 then
-                    0
-                else
-                    1
-          , isPregnant = False
-          , pregnantDuration = 0
-          }
+        , child
         ]
 
     else
-        [ villager ]
+        [ mother ]
 
 ageVillager : Villager -> Villager 
 ageVillager villager = 
@@ -120,14 +79,14 @@ moveVillager villager =
             villager.y + villager.vy
 
         newVx =
-            if newX < 10 || newX > 390 then
+            if newX < 10 || newX > 1200 then
                 -villager.vx
 
             else
                 villager.vx
 
         newVy =
-            if newY < 10 || newY > 290 then
+            if newY < 10 || newY > 700 then
                 -villager.vy
 
             else
@@ -139,3 +98,120 @@ moveVillager villager =
         , vx = newVx
         , vy = newVy
     }
+
+villagerGenerator : Int -> Random.Generator Villager
+villagerGenerator id =
+    Random.map5
+        (\x y vx vy gender ->
+            { id = id
+            , x = x
+            , y = y
+            , vx = vx
+            , vy = vy
+            , age = 0
+            , gender = gender
+            , isPregnant = False
+            , pregnantDuration = 0
+            }
+        )
+        (Random.float 10 1200)
+        (Random.float 10 700)
+        (randomVelocity)
+        (randomVelocity)
+        (Random.int 0 1)
+
+randomVelocity : Random.Generator Float
+randomVelocity =
+    Random.map2
+        (\speed sign ->
+            if sign == 0 then
+                speed
+            else
+                -speed
+        )
+        (Random.float 0.5 1)
+        (Random.int 0 1)
+
+pregnancyGenerator : Bool -> Villager -> Random.Generator Villager
+pregnancyGenerator hasMale villager =
+    if
+        hasMale
+            && villager.gender == 0
+            && tickInYears villager.age >= 18
+            && tickInYears villager.age <= 45
+            && not villager.isPregnant
+    then
+        Random.map
+            (\chance ->
+                if chance < pregnancyChancePerTick then
+                    { villager
+                        | isPregnant = True
+                        , pregnantDuration = 0
+                    }
+
+                else
+                    villager
+            )
+            (Random.float 0 1)
+
+    else
+        Random.constant villager
+
+pregnancyListGenerator : Bool -> List Villager -> Random.Generator (List Villager)
+pregnancyListGenerator hasMale villagers =
+    List.foldr
+        (\villager acc ->
+            Random.map2 (::)
+                (pregnancyGenerator hasMale villager)
+                acc
+        )
+        (Random.constant [])
+        villagers
+
+removeDeadVillagers : List Villager -> List Villager
+removeDeadVillagers villagers =
+    List.filter
+        (\villager ->
+            tickInYears villager.age < 90
+        )
+        villagers
+
+hasAdultMale : List Villager -> Bool
+hasAdultMale villagers =
+    List.any
+        (\villager ->
+            villager.gender == 1
+                && tickInYears villager.age >= 18
+        )
+        villagers
+
+viewVillager : Villager -> Svg.Svg msg
+viewVillager villager =
+    let
+        underaged =
+            tickInYears villager.age < 18
+
+        color =
+            if villager.gender == 0 then
+                if underaged then
+                    "pink"
+                else
+                    "red"
+            else if underaged then
+                "lightblue"
+            else
+                "blue"
+
+        size =
+            if underaged then 
+                "3"
+            else 
+                "6"
+    in
+    circle
+        [ cx (String.fromFloat villager.x)
+        , cy (String.fromFloat villager.y)
+        , r size
+        , fill color
+        ]
+        []

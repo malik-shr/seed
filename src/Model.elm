@@ -4,5 +4,8 @@ import Villager exposing (Villager)
 type alias Model =
     { time : Float
     , villagers : List Villager
+    , nextVillagerId : Int
     , tick : Int
+    , pregnancyChances : List Int
+    , newVillager : Villager
     }
