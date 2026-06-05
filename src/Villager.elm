@@ -9,7 +9,6 @@ module Villager exposing
     , pregnancyGenerator
     , pregnancyListGenerator
     , removeDeadVillagers
-    , hasAdultMale
     )
 
 import Svg exposing (svg, circle, rect)
@@ -132,10 +131,11 @@ randomVelocity =
         (Random.float 0.5 1)
         (Random.int 0 1)
 
-pregnancyGenerator : Bool -> Villager -> Random.Generator Villager
-pregnancyGenerator hasMale villager =
+pregnancyGenerator : Bool ->  Bool -> Villager -> Random.Generator Villager
+pregnancyGenerator hasMale underThousand villager =
     if
         hasMale
+            && underThousand
             && villager.gender == 0
             && tickInYears villager.age >= 18
             && tickInYears villager.age <= 45
@@ -157,12 +157,24 @@ pregnancyGenerator hasMale villager =
     else
         Random.constant villager
 
-pregnancyListGenerator : Bool -> List Villager -> Random.Generator (List Villager)
-pregnancyListGenerator hasMale villagers =
+
+
+pregnancyListGenerator : List Villager -> Random.Generator (List Villager)
+pregnancyListGenerator villagers =
+    let 
+        underThousand = List.length villagers < 1000
+        hasMale = List.any
+            (\villager ->
+                villager.gender == 1
+                    && tickInYears villager.age >= 18
+            )
+            villagers
+    in 
+
     List.foldr
         (\villager acc ->
             Random.map2 (::)
-                (pregnancyGenerator hasMale villager)
+                (pregnancyGenerator hasMale underThousand villager)
                 acc
         )
         (Random.constant [])
@@ -173,15 +185,6 @@ removeDeadVillagers villagers =
     List.filter
         (\villager ->
             tickInYears villager.age < 90
-        )
-        villagers
-
-hasAdultMale : List Villager -> Bool
-hasAdultMale villagers =
-    List.any
-        (\villager ->
-            villager.gender == 1
-                && tickInYears villager.age >= 18
         )
         villagers
 

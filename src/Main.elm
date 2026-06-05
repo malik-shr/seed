@@ -18,7 +18,6 @@ import Villager exposing
     , villagerGenerator
     , removeDeadVillagers
     , pregnancyListGenerator
-    , hasAdultMale
     )
 
 import Random
@@ -68,7 +67,7 @@ update msg model =
             ( updatedModel
             , Cmd.batch
                 [ Random.generate PregnancyCalculated
-                    (pregnancyListGenerator (hasAdultMale updatedModel.villagers) updatedModel.villagers)
+                    (pregnancyListGenerator updatedModel.villagers)
 
                 , Random.generate NewVillager
                     (villagerGenerator updatedModel.nextVillagerId)
