@@ -196,20 +196,24 @@ viewVillager villager =
 
         color =
             if villager.gender == 0 then
-                if underaged then
-                    "pink"
-                else
-                    "red"
+                if villager.isPregnant then "purple"
+                else 
+                    if underaged then
+                        "pink"
+                    else
+                        "red"
             else if underaged then
                 "lightblue"
             else
                 "blue"
 
         size =
-            if underaged then 
-                "3"
+            if villager.isPregnant then "8"
             else 
-                "6"
+                if underaged then 
+                    "3"
+                else 
+                    "6"
     in
     circle
         [ cx (String.fromFloat villager.x)
