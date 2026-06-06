@@ -11,17 +11,12 @@ module Villager exposing
     , removeDeadVillagers
     )
 
-import Svg exposing (svg, circle, rect)
-import Svg.Attributes exposing (cx, cy, fill, height, r, viewBox, width, x, y)
-
+import Svg exposing (circle)
+import Svg.Attributes exposing (cx, cy, fill, r, x, y)
+import Constants exposing (pregnancyChancePerTick, deathAge)
 import Utils exposing (tickInYears)
 
 import Random
-import Randoms exposing (pseudoRandomInt)
-
-pregnancyChancePerTick : Float
-pregnancyChancePerTick =
-    0.002
 
 type alias Villager =
     { 
@@ -78,14 +73,14 @@ moveVillager villager =
             villager.y + villager.vy
 
         newVx =
-            if newX < 10 || newX > 1200 then
+            if newX < 10 || newX > 790 then
                 -villager.vx
 
             else
                 villager.vx
 
         newVy =
-            if newY < 10 || newY > 700 then
+            if newY < 10 || newY > 590 then
                 -villager.vy
 
             else
@@ -113,8 +108,8 @@ villagerGenerator id =
             , pregnantDuration = 0
             }
         )
-        (Random.float 10 1200)
-        (Random.float 10 700)
+        (Random.float 10 750)
+        (Random.float 10 550)
         (randomVelocity)
         (randomVelocity)
         (Random.int 0 1)
@@ -184,7 +179,7 @@ removeDeadVillagers : List Villager -> List Villager
 removeDeadVillagers villagers =
     List.filter
         (\villager ->
-            tickInYears villager.age < 90
+            tickInYears villager.age < deathAge
         )
         villagers
 

@@ -2,17 +2,15 @@ module Main exposing (main)
 
 import Browser
 import Browser.Events
-import Html exposing (Html, div, p, text)
-import Svg exposing (svg, rect)
-import Svg.Attributes exposing (fill, height, viewBox, width, x, y)
 
 import Model exposing (Model)
 import Msg exposing (Msg(..))
+import View exposing (view)
+import Statistics exposing (calculateStatistics)
 
 import Villager exposing 
-    (Villager
-    , viewVillager
-    , updatePregnancyDuration
+    (
+    updatePregnancyDuration
     , giveBirth, ageVillager
     , moveVillager
     , villagerGenerator
@@ -21,9 +19,6 @@ import Villager exposing
     )
 
 import Random
-import Task exposing (Task)
-import Utils exposing (tickInYears)
-
 
 main : Program () Model Msg
 main =
@@ -45,7 +40,9 @@ init _ =
       , tick = 0
       , nextVillagerId = 0
       , pregnancyChances = []
-      , newVillager = {id = 3, x = 80, y = 80, vx = 0.2, vy = 0.1, age = 0, gender = 0, isPregnant = False, pregnantDuration = 0}
+      , newVillager = { id = 3, x = 80, y = 80, vx = 0.2, vy = 0.1, age = 0, gender = 0, isPregnant = False, pregnantDuration = 0}
+      , deathCount = 0
+      , statistics = { femaleCount = 0, maleCount = 0, childrenCount = 0, adultsCount = 0, pregnantCount = 0, fertileFemaleCount = 0}
       }
     , Cmd.none
     )
@@ -95,46 +92,29 @@ update msg model =
 updateWorld : Float -> Model -> Model
 updateWorld delta model =
     let
-        updatedVillagers =
+        beforeDeathCheck =
             model.villagers
                 |> List.map moveVillager
                 |> List.map ageVillager
                 |> List.map updatePregnancyDuration
                 |> List.concatMap (giveBirth model.newVillager)
-                |> removeDeadVillagers
+
+        updatedVillagers =
+            removeDeadVillagers beforeDeathCheck
+
+        diedThisTick =
+            List.length beforeDeathCheck - List.length updatedVillagers
     in
     { model
         | time = model.time + delta
         , tick = model.tick + 1
+        , deathCount = model.deathCount + diedThisTick
         , villagers = updatedVillagers
-        , nextVillagerId = List.length model.villagers
+        , statistics = calculateStatistics updatedVillagers
     }
 
 
 
-view : Model -> Html Msg
-view model =
-    div []
-        [ svg
-            [ width "1280"
-            , height "720"
-            , viewBox "0 0 1280 720"
-            ]
-            ([ rect
-                [ x "0"
-                , y "0"
-                , width "1280"
-                , height "720"
-                , fill "#eef5e5"
-                ]
-                []
-             ]
-                ++ List.map viewVillager model.villagers
-            )
-        , p [] [ text ("Tick:" ++ String.fromInt(model.tick))]
-        , p [] [ text ("Year:" ++ String.fromInt(tickInYears model.tick))]
-        , p [] [ text ("Villagers:" ++ String.fromInt(List.length model.villagers))]
-        ]
 
 
 

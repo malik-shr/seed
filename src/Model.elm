@@ -1,5 +1,6 @@
 module Model exposing (Model)
 import Villager exposing (Villager)
+import Statistics exposing (Statistics)
 
 type alias Model =
     { time : Float
@@ -8,4 +9,6 @@ type alias Model =
     , tick : Int
     , pregnancyChances : List Int
     , newVillager : Villager
+    , deathCount : Int
+    , statistics : Statistics
     }

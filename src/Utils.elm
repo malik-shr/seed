@@ -1,5 +1,7 @@
 module Utils exposing (tickInYears)
 
+import Constants exposing (ticksPerYear)
+
 tickInYears : Int -> Int
 tickInYears tick =
-    tick // 100
+    tick // ticksPerYear
