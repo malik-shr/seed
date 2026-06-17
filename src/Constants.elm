@@ -8,4 +8,4 @@ deathAge : Int
 deathAge = 85
 
 ticksPerYear : Int 
-ticksPerYear = 180
+ticksPerYear = 360

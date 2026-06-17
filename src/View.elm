@@ -1,61 +1,98 @@
 module View exposing (view)
 
+import Html exposing (Html, div, p, span, text)
+import Html.Attributes as HtmlAttr
+
 import Model exposing (Model)
-import Msg exposing (Msg(..))
-import Utils exposing (tickInYears)
+import Msg exposing (Msg)
 
-import Html exposing (Html, div, p, text)
-import Html.Attributes exposing (class)
+import Svg exposing (rect, svg)
+import Svg.Attributes as SvgAttr
 
-import Svg exposing (svg, rect)
-import Svg.Attributes exposing (fill, height, viewBox, width, x, y)
+import Utils exposing (tickInYears, numberToMonth)
 
 import Villager exposing (viewVillager)
 
+
 view : Model -> Html Msg
 view model =
-    div [class "gameWrapper"]
+    div [ HtmlAttr.class "gameWrapper" ]
         [ game model
-        , container model
+        , dashboard model
         ]
 
-game: Model -> Html Msg
-game model =  
+
+game : Model -> Html Msg
+game model =
     svg
-        [ width "800"
-        , height "600"
-        , viewBox "0 0 800 600"
+        [ SvgAttr.width "800"
+        , SvgAttr.height "600"
+        , SvgAttr.viewBox "0 0 800 600"
+        , SvgAttr.class "gameCanvas"
         ]
         ([ rect
-            [ x "0"
-            , y "0"
-            , width "800"
-            , height "600"
-            , fill "#eef5e5"
+            [ SvgAttr.x "0"
+            , SvgAttr.y "0"
+            , SvgAttr.width "800"
+            , SvgAttr.height "600"
+            , SvgAttr.fill "#eef5e5"
             ]
             []
-            ]
-            ++ List.map viewVillager model.villagers
+         ]
+            ++ (model.villagers
+                |> List.take 200
+                |> List.map viewVillager
+               )
         )
 
-container: Model -> Html Msg
-container model = 
-    div [class "container"] 
-        [ div [] 
-            [ p [] [ text ("Tick:" ++ String.fromInt(model.tick))]
-            , p [] [ text ("Year:" ++ String.fromInt(tickInYears model.tick))]
-            ,p [] [ text ("Month: " ++ String.fromInt (modBy 12 ((model.tick // 15)) + 1))]
+
+dashboard : Model -> Html Msg
+dashboard model =
+    let
+        day =
+            modBy 30 model.tick + 1
+
+        month =
+            modBy 12 (model.tick // 30)
+
+        year =
+            tickInYears model.tick
+    in
+    div [ HtmlAttr.class "dashboard" ]
+        [ div [ HtmlAttr.class "dashboardHeader" ]
+            [ p [ HtmlAttr.class "eyebrow" ]
+                [ text "Seed Simulation" ]
+            , p [ HtmlAttr.class "dateText" ]
+                [ text
+                    (
+                        String.fromInt day
+                        ++ "."
+                        ++ numberToMonth month
+                        ++ " "
+                        ++ String.fromInt year
+                    )
+                ]
             ]
-        , div [] 
-            [ p [] [ text ("Villagers:" ++ String.fromInt(List.length model.villagers))]
-            , p [] [ text ("Dead:" ++ String.fromInt(model.deathCount))]
+
+        , div [ HtmlAttr.class "statsGrid" ]
+            [ statCard "Villagers" (String.fromInt (List.length model.villagers))
+            , statCard "Dead" (String.fromInt model.deathCount)
+            , statCard "Female" (String.fromInt model.statistics.femaleCount)
+            , statCard "Male" (String.fromInt model.statistics.maleCount)
+            , statCard "Children" (String.fromInt model.statistics.childrenCount)
+            , statCard "Adults" (String.fromInt model.statistics.adultsCount)
+            , statCard "Pregnant" (String.fromInt model.statistics.pregnantCount)
+            , statCard "Fertile Female" (String.fromInt model.statistics.fertileFemaleCount)
+            , statCard "∅Age" (String.fromFloat(model.statistics.averageAge))
             ]
-        , div [] 
-            [ p [] [ text ("Female:" ++ String.fromInt(model.statistics.femaleCount))]
-            , p [] [ text ("Male:" ++ String.fromInt(model.statistics.maleCount))]
-            , p [] [ text ("Children:" ++ String.fromInt(model.statistics.childrenCount))]
-            , p [] [ text ("Adults:" ++ String.fromInt(model.statistics.adultsCount))]
-            , p [] [ text ("Pregnant:" ++ String.fromInt(model.statistics.pregnantCount))]
-            , p [] [ text ("Fertile Female:" ++ String.fromInt(model.statistics.fertileFemaleCount))]
-            ]
-    ]
+        ]
+
+
+statCard : String -> String -> Html Msg
+statCard label value =
+    div [ HtmlAttr.class "statCard" ]
+        [ span [ HtmlAttr.class "statLabel" ]
+            [ text label ]
+        , span [ HtmlAttr.class "statValue" ]
+            [ text value ]
+        ]

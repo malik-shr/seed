@@ -3,6 +3,8 @@ module Statistics exposing (Statistics, calculateStatistics)
 import Villager exposing (Villager)
 
 import Utils exposing (tickInYears)
+import Utils exposing (roundTo2)
+
 
 type alias Statistics =
     { femaleCount : Int
@@ -11,6 +13,7 @@ type alias Statistics =
     , adultsCount : Int
     , pregnantCount : Int
     , fertileFemaleCount : Int 
+    , averageAge : Float
     }
 
 calculateStatistics : List Villager -> Statistics
@@ -56,6 +59,23 @@ calculateStatistics villagers =
                     && tickInYears villager.age < 45
                 )
             villagers
+
+        averageAge = 
+            let
+                totalAge =
+                    villagers
+                        |> List.map (\v -> tickInYears v.age)
+                        |> List.sum
+
+                villagerCount =
+                    List.length villagers
+                average =
+                    if villagerCount == 0 then
+                        0
+                    else
+                        toFloat totalAge / toFloat villagerCount
+            in
+            roundTo2 average
     in 
 
     { maleCount = List.length maleCount
@@ -64,4 +84,5 @@ calculateStatistics villagers =
     , childrenCount = List.length children
     , pregnantCount = List.length pregnantCount
     , fertileFemaleCount = List.length fertileWomanCount
+    , averageAge = averageAge
     }

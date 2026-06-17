@@ -8,15 +8,17 @@ module Villager exposing
     , villagerGenerator
     , pregnancyGenerator
     , pregnancyListGenerator
-    , removeDeadVillagers
+    , deathListGenerator
     )
 
-import Svg exposing (circle)
-import Svg.Attributes exposing (cx, cy, fill, r, x, y)
+import Svg exposing (Svg, text_)
+import Svg.Attributes exposing (x, y, fill, fontSize)
+import Svg exposing (text)
 import Constants exposing (pregnancyChancePerTick, deathAge)
 import Utils exposing (tickInYears)
 
 import Random
+import Svg.Attributes exposing (textLength)
 
 type alias Villager =
     { 
@@ -126,11 +128,71 @@ randomVelocity =
         (Random.float 0.5 1)
         (Random.int 0 1)
 
-pregnancyGenerator : Bool ->  Bool -> Villager -> Random.Generator Villager
-pregnancyGenerator hasMale underThousand villager =
+deathChance : Villager -> Float
+deathChance villager =
+    let
+        age =
+            tickInYears villager.age
+    in
+    if age < 50 then
+        0.000005
+    else if age < 70 then
+        0.00005
+    else if age < 90 then
+        0.0005
+    else
+        0.005
+
+deathGenerator : Villager -> Random.Generator (Maybe Villager)
+deathGenerator villager =
+    Random.map
+        (\chance ->
+            if chance < deathChance villager then
+                Nothing
+
+            else
+                Just villager
+        )
+        (Random.float 0 1)
+
+deathListGenerator : List Villager -> Random.Generator (List Villager)
+deathListGenerator villagers =
+    List.foldr
+        (\villager acc ->
+            Random.map2
+                (\maybeVillager list ->
+                    case maybeVillager of
+                        Just v ->
+                            v :: list
+
+                        Nothing ->
+                            list
+                )
+                (deathGenerator villager)
+                acc
+        )
+        (Random.constant [])
+        villagers
+
+
+
+pregnancyGenerator : List Villager -> Villager -> Random.Generator Villager
+pregnancyGenerator villagers villager =
+   
+    let 
+        underThousand = List.length villagers < 1000
+        hasMale = List.any
+            (\v ->
+                v.gender == 1
+                    && tickInYears v.age >= 18
+                    && tickInYears v.age - tickInYears villager.age < 18
+                    && tickInYears v.age - tickInYears villager.age > -18
+            )
+            villagers
+    in 
+
     if
         hasMale
-            && underThousand
             && villager.gender == 0
             && tickInYears villager.age >= 18
             && tickInYears villager.age <= 45
@@ -156,20 +218,10 @@ pregnancyGenerator hasMale underThousand villager =
 
 pregnancyListGenerator : List Villager -> Random.Generator (List Villager)
 pregnancyListGenerator villagers =
-    let 
-        underThousand = List.length villagers < 1000
-        hasMale = List.any
-            (\villager ->
-                villager.gender == 1
-                    && tickInYears villager.age >= 18
-            )
-            villagers
-    in 
-
     List.foldr
         (\villager acc ->
             Random.map2 (::)
-                (pregnancyGenerator hasMale underThousand villager)
+                (pregnancyGenerator villagers villager)
                 acc
         )
         (Random.constant [])
@@ -189,31 +241,38 @@ viewVillager villager =
         underaged =
             tickInYears villager.age < 18
 
-        color =
+        emoji =
             if villager.gender == 0 then
-                if villager.isPregnant then "purple"
+                if villager.isPregnant then "🤰"
                 else 
                     if underaged then
-                        "pink"
+                        "👶"
+                    else if tickInYears villager.age > 45 then 
+                        "👵"
+                    else if tickInYears villager.age > 70 then
+                        "👩‍🦽‍➡️"
                     else
-                        "red"
-            else if underaged then
-                "lightblue"
-            else
-                "blue"
+                        "👩"
+            else 
+                if underaged then
+                    "👶"
+                else if tickInYears villager.age > 70 then 
+                    "🧑‍🦽‍➡️"
+                else
+                    "🧔‍♂️"
 
         size =
-            if villager.isPregnant then "8"
+            if villager.isPregnant then "26"
             else 
                 if underaged then 
-                    "3"
+                    "18"
                 else 
-                    "6"
+                    "24"
     in
-    circle
-        [ cx (String.fromFloat villager.x)
-        , cy (String.fromFloat villager.y)
-        , r size
-        , fill color
+    text_
+        [ x (String.fromFloat villager.x )
+        , y (String.fromFloat villager.y )
+        , fill "black"
+        , fontSize size
         ]
-        []
+        [ text emoji ]

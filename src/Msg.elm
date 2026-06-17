@@ -6,4 +6,5 @@ type Msg
     | GenNewVillagerValues 
     | NewVillager Villager
     | PregnancyCalculated (List Villager)
+    | DeathCalculated (List Villager)
 
