@@ -11,4 +11,6 @@ type alias Model =
     , newVillager : Villager
     , deathCount : Int
     , statistics : Statistics
+    , filledGridRows : List Int
+    , tileImage : String
     }

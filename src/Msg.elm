@@ -7,4 +7,4 @@ type Msg
     | NewVillager Villager
     | PregnancyCalculated (List Villager)
     | DeathCalculated (List Villager)
-
+    | FillGridRow Int

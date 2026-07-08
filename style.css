@@ -2,6 +2,7 @@ body {
   margin: 0;
   background: #f7f4ec;
   font-family: system-ui, sans-serif;
+  overflow: hidden;
 }
 
 .gameWrapper {
@@ -9,8 +10,9 @@ body {
   gap: 24px;
   align-items: flex-start;
   padding: 24px;
-  min-height: 100vh;
+  height: 100vh;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .gameCanvas {
@@ -22,6 +24,8 @@ body {
 
 .dashboard {
   width: 340px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
   background: white;
   border-radius: 18px;
   padding: 20px;
@@ -52,6 +56,29 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.rowButtonGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.fillGridButton {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #1f2a1f;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fillGridButton:hover {
+  background: #334332;
 }
 
 .statCard {

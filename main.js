@@ -1,5 +1,6 @@
 import "./style.css";
 import { Elm } from "./src/Main.elm";
+import tileImage from "./src/assets/logo.png";
 
 if (process.env.NODE_ENV === "development") {
     const ElmDebugTransform = await import("elm-debug-transformer")
@@ -10,4 +11,9 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const root = document.querySelector("#app div");
-const app = Elm.Main.init({ node: root });
+const app = Elm.Main.init({
+    node: root,
+    flags: {
+        tileImage
+    }
+});

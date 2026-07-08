@@ -19,10 +19,14 @@ import Villager exposing
     )
 
 import Random
-import Constants exposing (ticksPerYear)
+import Constants exposing (gridColumns, gridRows, ticksPerYear)
 import Villager exposing (deathListGenerator)
 
-main : Program () Model Msg
+type alias Flags =
+    { tileImage : String
+    }
+
+main : Program Flags Model Msg
 main =
     Browser.element
         { init = init
@@ -32,8 +36,8 @@ main =
         }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
+init : Flags -> ( Model, Cmd Msg )
+init flags =
     ( { time = 0
       , villagers =
             [ { id = 0, x = 80, y = 80, vx = 0.2, vy = 0.1, age = 18 * ticksPerYear, gender = 0, isPregnant = False, pregnantDuration = 0 }
@@ -45,6 +49,8 @@ init _ =
       , newVillager = { id = 3, x = 80, y = 80, vx = 0.2, vy = 0.1, age = 0, gender = 0, isPregnant = False, pregnantDuration = 0}
       , deathCount = 0
       , statistics = { femaleCount = 0, maleCount = 0, childrenCount = 0, adultsCount = 0, pregnantCount = 0, fertileFemaleCount = 0, averageAge = 0}
+      , filledGridRows = List.repeat gridRows 0
+      , tileImage = flags.tileImage
       }
     , Cmd.none
     )
@@ -104,6 +110,26 @@ update msg model =
                 | newVillager = newVillager
             }
             , Cmd.none
+            )
+
+        FillGridRow rowIndex ->
+            ( { model
+                | filledGridRows =
+                    fillGridRow rowIndex model.filledGridRows
+              }
+            , Cmd.none
+            )
+
+fillGridRow : Int -> List Int -> List Int
+fillGridRow targetRow filledGridRows =
+    filledGridRows
+        |> List.indexedMap
+            (\rowIndex filledCells ->
+                if rowIndex == targetRow then
+                    min gridColumns (filledCells + 1)
+
+                else
+                    filledCells
             )
 
 updateWorld : Float -> Model -> Model
