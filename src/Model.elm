@@ -22,7 +22,10 @@ type alias Model =
     , deathCount : Int
     , statistics : Statistics
     , filledGridRows : List Int
+    , buildingGrid : List (Maybe Int)
+    , draggedBuilding : Maybe Int
     , tileImage : String
+    , buildingImages : List String
     , key : Nav.Key
     , url : Url
     , worldCalculationPending : Bool

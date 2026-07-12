@@ -11,5 +11,9 @@ type Msg
     | WorldCalculated (List Villager)
     | FeedVillagers 
     | FillGridRow Int
+    | StartDraggingBuilding Int
+    | DropBuilding Int
+    | StopDraggingBuilding
+    | NoOp
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url

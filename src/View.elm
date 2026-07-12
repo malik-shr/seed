@@ -3,10 +3,11 @@ module View exposing (view, sidebarContent)
 import Constants exposing (gridCellCount, gridCellHeight, gridCellWidth, gridColumns, gridRows)
 import Html exposing (Html, a, button, div, p, span, text)
 import Html.Attributes as HtmlAttr
-import Html.Events exposing (onClick)
+import Html.Events exposing (custom, on, onClick)
+import Json.Decode as Decode
 import Model exposing (Model, SidebarTab(..))
 import Msg exposing (Msg(..))
-import Svg exposing (Svg, image, rect, svg)
+import Svg exposing (Svg, g, image, rect, svg)
 import Svg.Attributes as SvgAttr
 import Utils exposing (numberToMonth, tickInYears)
 import Villager exposing (viewVillager)
@@ -58,34 +59,81 @@ gridCell model index =
         yPos =
             toFloat row * gridCellHeight
 
+        droppedBuilding =
+            buildingInCell model index
+
+        dropTargetAttributes =
+            [ onDragOver
+            , onDrop (DropBuilding index)
+            ]
+
         cellFrame =
             rect
-                [ SvgAttr.x (String.fromFloat xPos)
-                , SvgAttr.y (String.fromFloat yPos)
-                , SvgAttr.width (String.fromFloat gridCellWidth)
-                , SvgAttr.height (String.fromFloat gridCellHeight)
-                , SvgAttr.fill "#eef5e5"
-                , SvgAttr.stroke "#cbd8bd"
-                , SvgAttr.strokeWidth "1"
-                ]
+                ([ SvgAttr.x (String.fromFloat xPos)
+                 , SvgAttr.y (String.fromFloat yPos)
+                 , SvgAttr.width (String.fromFloat gridCellWidth)
+                 , SvgAttr.height (String.fromFloat gridCellHeight)
+                 , SvgAttr.fill "#eef5e5"
+                 , SvgAttr.stroke "#cbd8bd"
+                 , SvgAttr.strokeWidth "1"
+                 ]
+                    ++ dropTargetAttributes
+                )
                 []
     in
-    if column < filledCellsInRow row model.filledGridRows then
-        [ cellFrame
-        , image
-            [ SvgAttr.x (String.fromFloat xPos)
-            , SvgAttr.y (String.fromFloat yPos)
-            , SvgAttr.width (String.fromFloat gridCellWidth)
-            , SvgAttr.height (String.fromFloat gridCellHeight)
-            , SvgAttr.xlinkHref model.tileImage
-            , SvgAttr.preserveAspectRatio "xMidYMid slice"
-            , SvgAttr.opacity "0.78"
-            ]
-            []
-        ]
+    [ g dropTargetAttributes
+        (cellFrame
+            :: (case droppedBuilding of
+                    Just buildingIndex ->
+                        [ image
+                            ([ SvgAttr.x (String.fromFloat xPos)
+                             , SvgAttr.y (String.fromFloat yPos)
+                             , SvgAttr.width (String.fromFloat gridCellWidth)
+                             , SvgAttr.height (String.fromFloat gridCellHeight)
+                             , SvgAttr.xlinkHref (buildingImage model buildingIndex)
+                             , SvgAttr.preserveAspectRatio "xMidYMid slice"
+                             , SvgAttr.opacity "0.78"
+                             ]
+                                ++ dropTargetAttributes
+                            )
+                            []
+                        ]
 
-    else
-        [ cellFrame ]
+                    Nothing ->
+                        []
+               )
+        )
+    ]
+
+
+buildingInCell : Model -> Int -> Maybe Int
+buildingInCell model cellIndex =
+    model.buildingGrid
+        |> List.drop cellIndex
+        |> List.head
+        |> Maybe.andThen identity
+
+
+onDragOver : Svg.Attribute Msg
+onDragOver =
+    custom "dragover"
+        (Decode.succeed
+            { message = NoOp
+            , stopPropagation = False
+            , preventDefault = True
+            }
+        )
+
+
+onDrop : Msg -> Svg.Attribute Msg
+onDrop msg =
+    custom "drop"
+        (Decode.succeed
+            { message = msg
+            , stopPropagation = False
+            , preventDefault = True
+            }
+        )
 
 
 dashboard : Model -> Html Msg
@@ -227,52 +275,52 @@ filledCellsInRow targetRow filledGridRows =
         |> Maybe.withDefault 0
 
 
+buildingImage : Model -> Int -> String
+buildingImage model rowIndex =
+    model.buildingImages
+        |> List.drop rowIndex
+        |> List.head
+        |> Maybe.withDefault model.tileImage
+
+
 rowFillButton : Model -> Int -> Html Msg
 rowFillButton model rowIndex =
-    let
-        filledCells =
-            filledCellsInRow rowIndex model.filledGridRows
-    in
     button
         [ HtmlAttr.class "fillGridButton"
+        , HtmlAttr.attribute "draggable" "true"
+        , on "dragstart" (Decode.succeed (StartDraggingBuilding rowIndex))
+        , on "dragend" (Decode.succeed StopDraggingBuilding)
         , onClick (FillGridRow rowIndex)
         ]
-        [ text
-            (rowName rowIndex
-                ++ " "
-                ++ String.fromInt filledCells
-                ++ "/"
-                ++ String.fromInt gridColumns
-            )
-        ]
+        [ text (rowName rowIndex) ]
 
 
 rowName : Int -> String
 rowName rowIndex =
     case rowIndex of
         0 ->
-            "Houses"
+            "Häuser"
 
         1 ->
-            "Farms"
+            "Farmen"
 
         2 ->
-            "Schools"
+            "Schulen"
 
         3 ->
-            "Markets"
+            "Kaufhäuser"
 
         4 ->
-            "Taverns"
+            "Tavernen"
 
         5 ->
-            "Wells"
+            "Brunnen"
 
         6 ->
-            "Granaries"
+            "Getreidespeicher"
 
         7 ->
-            "Bakeries"
+            "Bäckereien"
 
         _ ->
             "Row " ++ String.fromInt (rowIndex + 1)

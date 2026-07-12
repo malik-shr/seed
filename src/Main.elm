@@ -22,13 +22,14 @@ import Villager exposing
     )
 
 import Random
-import Constants exposing (gridColumns, gridRows, ticksPerYear)
+import Constants exposing (gridCellCount, gridColumns, gridRows, ticksPerYear)
 import Villager exposing (deathListGenerator)
 import Url exposing (Url)
 import List exposing (length)
 
 type alias Flags =
     { tileImage : String
+    , buildingImages : List String
     }
 
 main : Program Flags Model Msg
@@ -65,7 +66,10 @@ init flags url key =
       , deathCount = 0
       , statistics = { femaleCount = 0, maleCount = 0, childrenCount = 0, adultsCount = 0, pregnantCount = 0, fertileFemaleCount = 0, averageAge = 0}
       , filledGridRows = List.repeat gridRows 0
+      , buildingGrid = List.repeat gridCellCount Nothing
+      , draggedBuilding = Nothing
       , tileImage = flags.tileImage
+      , buildingImages = flags.buildingImages
       , key = key
       , url = url
       , worldCalculationPending = False
@@ -163,12 +167,24 @@ update msg model =
             )
 
         FillGridRow rowIndex ->
-            ( { model
-                | filledGridRows =
-                    fillGridRow rowIndex model.filledGridRows
-              }
-            , Cmd.none
-            )
+            ( fillNextCellInRow rowIndex model, Cmd.none )
+
+        StartDraggingBuilding buildingIndex ->
+            ( { model | draggedBuilding = Just buildingIndex }, Cmd.none )
+
+        DropBuilding cellIndex ->
+            case model.draggedBuilding of
+                Just buildingIndex ->
+                    ( placeBuilding cellIndex buildingIndex model, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        StopDraggingBuilding ->
+            ( { model | draggedBuilding = Nothing }, Cmd.none )
+
+        NoOp ->
+            ( model, Cmd.none )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -198,6 +214,63 @@ fillGridRow targetRow filledGridRows =
 
                 else
                     filledCells
+            )
+
+
+fillNextCellInRow : Int -> Model -> Model
+fillNextCellInRow rowIndex model =
+    let
+        filledCells =
+            model.filledGridRows
+                |> List.drop rowIndex
+                |> List.head
+                |> Maybe.withDefault 0
+
+        cellIndex =
+            rowIndex * gridColumns + filledCells
+    in
+    if filledCells >= gridColumns then
+        model
+
+    else
+        { model
+            | filledGridRows = fillGridRow rowIndex model.filledGridRows
+            , buildingGrid = setAt cellIndex (Just rowIndex) model.buildingGrid
+        }
+
+
+placeBuilding : Int -> Int -> Model -> Model
+placeBuilding cellIndex buildingIndex model =
+    { model
+        | buildingGrid = setAt cellIndex (Just buildingIndex) model.buildingGrid
+        , filledGridRows = filledRowsFromGrid (setAt cellIndex (Just buildingIndex) model.buildingGrid)
+        , draggedBuilding = Nothing
+    }
+
+
+setAt : Int -> a -> List a -> List a
+setAt targetIndex value values =
+    values
+        |> List.indexedMap
+            (\index currentValue ->
+                if index == targetIndex then
+                    value
+
+                else
+                    currentValue
+            )
+
+
+filledRowsFromGrid : List (Maybe Int) -> List Int
+filledRowsFromGrid buildingGrid =
+    List.range 0 (gridRows - 1)
+        |> List.map
+            (\rowIndex ->
+                buildingGrid
+                    |> List.drop (rowIndex * gridColumns)
+                    |> List.take gridColumns
+                    |> List.filterMap identity
+                    |> List.length
             )
 
 updateWorld : Float -> Model -> Model
