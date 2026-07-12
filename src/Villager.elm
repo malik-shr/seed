@@ -2,13 +2,14 @@ module Villager exposing
     (Villager
     , viewVillager
     , updatePregnancyDuration
-    , giveBirth
     , ageVillager
     , moveVillager
     , villagerGenerator
     , pregnancyGenerator
     , pregnancyListGenerator
     , deathListGenerator
+    , giveBirth
+    , useFood
     )
 
 import Svg exposing (Svg, text_)
@@ -28,6 +29,7 @@ type alias Villager =
     , vx : Float
     , vy : Float
     , age : Int
+    , food : Int
     , gender : Int 
     , isPregnant : Bool
     , pregnantDuration : Int 
@@ -64,6 +66,15 @@ ageVillager villager =
     { villager
         | age = newAge
     }
+
+useFood : Villager -> Villager
+useFood villager  =
+    {
+        villager
+        | food = villager.food - 1
+    }
+
+
 
 moveVillager : Villager -> Villager
 moveVillager villager =
@@ -105,6 +116,7 @@ villagerGenerator id =
             , vx = vx
             , vy = vy
             , age = 0
+            , food = 0
             , gender = gender
             , isPregnant = False
             , pregnantDuration = 0
@@ -134,14 +146,17 @@ deathChance villager =
         age =
             tickInYears villager.age
     in
-    if age < 50 then
-        0.000005
-    else if age < 70 then
-        0.00005
-    else if age < 90 then
-        0.0005
-    else
-        0.005
+    if villager.food < 0 then 
+        0.5
+    else 
+        if age < 50 then
+            0.000005
+        else if age < 70 then
+            0.00005
+        else if age < 90 then
+            0.0005
+        else
+            0.005
 
 deathGenerator : Villager -> Random.Generator (Maybe Villager)
 deathGenerator villager =
