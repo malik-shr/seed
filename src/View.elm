@@ -3,7 +3,7 @@ module View exposing (view, sidebarContent)
 import Constants exposing (gridCellCount, gridCellHeight, gridCellWidth, gridColumns, gridRows)
 import Html exposing (Html, a, button, div, p, span, text)
 import Html.Attributes as HtmlAttr
-import Html.Events exposing (custom, on, onClick)
+import Html.Events exposing (custom, on)
 import Json.Decode as Decode
 import Model exposing (Model, SidebarTab(..))
 import Msg exposing (Msg(..))
@@ -267,13 +267,6 @@ tabFromUrl url =
             StatisticsTab
 
 
-filledCellsInRow : Int -> List Int -> Int
-filledCellsInRow targetRow filledGridRows =
-    filledGridRows
-        |> List.drop targetRow
-        |> List.head
-        |> Maybe.withDefault 0
-
 
 buildingImage : Model -> Int -> String
 buildingImage model rowIndex =
@@ -290,7 +283,6 @@ rowFillButton model rowIndex =
         , HtmlAttr.attribute "draggable" "true"
         , on "dragstart" (Decode.succeed (StartDraggingBuilding rowIndex))
         , on "dragend" (Decode.succeed StopDraggingBuilding)
-        , onClick (FillGridRow rowIndex)
         ]
         [ text (rowName rowIndex) ]
 

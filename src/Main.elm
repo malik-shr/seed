@@ -166,8 +166,6 @@ update msg model =
             , Cmd.none
             )
 
-        FillGridRow rowIndex ->
-            ( fillNextCellInRow rowIndex model, Cmd.none )
 
         StartDraggingBuilding buildingIndex ->
             ( { model | draggedBuilding = Just buildingIndex }, Cmd.none )
@@ -204,48 +202,30 @@ worldGenerator villagers =
         |> Random.andThen deathListGenerator
 
 
-fillGridRow : Int -> List Int -> List Int
-fillGridRow targetRow filledGridRows =
-    filledGridRows
-        |> List.indexedMap
-            (\rowIndex filledCells ->
-                if rowIndex == targetRow then
-                    min gridColumns (filledCells + 1)
-
-                else
-                    filledCells
-            )
-
-
-fillNextCellInRow : Int -> Model -> Model
-fillNextCellInRow rowIndex model =
-    let
-        filledCells =
-            model.filledGridRows
-                |> List.drop rowIndex
-                |> List.head
-                |> Maybe.withDefault 0
-
-        cellIndex =
-            rowIndex * gridColumns + filledCells
-    in
-    if filledCells >= gridColumns then
-        model
-
-    else
-        { model
-            | filledGridRows = fillGridRow rowIndex model.filledGridRows
-            , buildingGrid = setAt cellIndex (Just rowIndex) model.buildingGrid
-        }
-
-
 placeBuilding : Int -> Int -> Model -> Model
 placeBuilding cellIndex buildingIndex model =
-    { model
-        | buildingGrid = setAt cellIndex (Just buildingIndex) model.buildingGrid
-        , filledGridRows = filledRowsFromGrid (setAt cellIndex (Just buildingIndex) model.buildingGrid)
-        , draggedBuilding = Nothing
-    }
+    case buildingInGridCell cellIndex model.buildingGrid of
+        Just _ ->
+            { model | draggedBuilding = Nothing }
+
+        Nothing ->
+            let
+                updatedGrid =
+                    setAt cellIndex (Just buildingIndex) model.buildingGrid
+            in
+            { model
+                | buildingGrid = updatedGrid
+                , filledGridRows = filledRowsFromGrid updatedGrid
+                , draggedBuilding = Nothing
+            }
+
+
+buildingInGridCell : Int -> List (Maybe Int) -> Maybe Int
+buildingInGridCell cellIndex buildingGrid =
+    buildingGrid
+        |> List.drop cellIndex
+        |> List.head
+        |> Maybe.andThen identity
 
 
 setAt : Int -> a -> List a -> List a

@@ -10,7 +10,6 @@ type Msg
     | NewVillager Villager
     | WorldCalculated (List Villager)
     | FeedVillagers 
-    | FillGridRow Int
     | StartDraggingBuilding Int
     | DropBuilding Int
     | StopDraggingBuilding
