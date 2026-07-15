@@ -2,7 +2,7 @@ module View exposing (sidebarContent, view)
 
 import Constants exposing (gridCellCount, gridCellHeight, gridCellWidth, gridColumns, gridRows)
 import Jobs exposing (allJobRows, assignedWorkerCount, jobCapacity, jobEffectSummary, jobName)
-import Html exposing (Html, a, button, div, input, p, span, text)
+import Html exposing (Html, a, button, div, input, p, span, text, img)
 import Html.Attributes as HtmlAttr
 import Html.Events exposing (custom, on, onInput)
 import Json.Decode as Decode
