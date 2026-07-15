@@ -12,6 +12,7 @@ import Svg.Attributes as SvgAttr
 import Utils exposing (numberToMonth, tickInYears)
 import Villager exposing (viewVillager)
 import Url
+import List exposing (length)
 
 
 view : Model -> Html Msg
@@ -139,6 +140,9 @@ onDrop msg =
 dashboard : Model -> Html Msg
 dashboard model =
     let
+        levelInfo =
+            populationLevelInfo (List.length model.villagers)
+
         day =
             modBy 30 model.tick + 1
 
@@ -149,7 +153,8 @@ dashboard model =
             tickInYears model.tick
     in
     div [ HtmlAttr.class "dashboard" ]
-        [ div [ HtmlAttr.class "dashboardHeader" ]
+        [ levelBar levelInfo
+        , div [ HtmlAttr.class "dashboardHeader" ]
             [ p [ HtmlAttr.class "eyebrow" ]
                 [ text "Seed Simulation" ]
             , p [ HtmlAttr.class "dateText" ]
@@ -167,6 +172,90 @@ dashboard model =
         ]
 
 
+levelBar : LevelInfo -> Html Msg
+levelBar levelInfo =
+    div [ HtmlAttr.class "levelBar" ]
+        [ div [ HtmlAttr.class "levelBarHeader" ]
+            [ span [ HtmlAttr.class "levelBarLabel" ]
+                [ text
+                    (if levelInfo.currentLevel == 0 then
+                        "Noch kein Level"
+
+                     else
+                        "Level " ++ String.fromInt levelInfo.currentLevel
+                    )
+                ]
+            , span [ HtmlAttr.class "levelBarMeta" ]
+                [ text
+                    (String.fromInt levelInfo.population
+                        ++ " / "
+                        ++ String.fromInt levelInfo.nextThreshold
+                        ++ " Einwohner"
+                    )
+                ]
+            ]
+        , div [ HtmlAttr.class "levelBarTrack" ]
+            [ div
+                [ HtmlAttr.class "levelBarFill"
+                , HtmlAttr.style "width"
+                    (String.fromFloat (levelInfo.progress * 100) ++ "%")
+                ]
+                []
+            ]
+        ]
+
+
+type alias LevelInfo =
+    { population : Int
+    , currentLevel : Int
+    , nextThreshold : Int
+    , progress : Float
+    }
+
+
+populationLevelInfo : Int -> LevelInfo
+populationLevelInfo population =
+    let
+        currentLevel =
+            if population < 10 then
+                0
+
+            else
+                floor (logBase 10 (toFloat population))
+
+        currentThreshold =
+            pow10 currentLevel
+
+        nextThreshold =
+            pow10 (currentLevel + 1)
+
+        progressRange =
+            nextThreshold - currentThreshold
+
+        progress =
+            if progressRange <= 0 then
+                1
+
+            else
+                clamp 0 1
+                    (toFloat (population - currentThreshold) / toFloat progressRange)
+    in
+    { population = population
+    , currentLevel = currentLevel
+    , nextThreshold = nextThreshold
+    , progress = progress
+    }
+
+
+pow10 : Int -> Int
+pow10 exponent =
+    if exponent <= 0 then
+        1
+
+    else
+        10 * pow10 (exponent - 1)
+
+
 sidebarNavigation : Model -> Html Msg
 sidebarNavigation model =
     let
@@ -175,6 +264,7 @@ sidebarNavigation model =
     in
     div [ HtmlAttr.class "sidebarTabs", HtmlAttr.attribute "role" "tablist" ]
         [ sidebarTabButton activeTab StatisticsTab "Statistiken"
+        , sidebarTabButton activeTab ProductionTab "Produktion"
         , sidebarTabButton activeTab JobsTab "Jobs"
         , sidebarTabButton activeTab BuildingsTab "Häuser"
         ]
@@ -209,6 +299,8 @@ sidebarTabUrl tab =
     case tab of
         StatisticsTab ->
             "/statistics"
+        ProductionTab ->
+            "/production"
         JobsTab ->
             "/jobs"
         BuildingsTab ->
@@ -229,7 +321,26 @@ sidebarContent model =
                 , statCard "Pregnant" (String.fromInt model.statistics.pregnantCount)
                 , statCard "Fertile Female" (String.fromInt model.statistics.fertileFemaleCount)
                 , statCard "Average Age" (String.fromFloat model.statistics.averageAge)
-                , statCard "Food" (String.fromInt model.food)
+                , statCard "Geld" (String.fromInt model.money)
+                ]
+
+        ProductionTab ->
+            div [ HtmlAttr.class "productionPanel", HtmlAttr.attribute "role" "tabpanel" ]
+                [ p [ HtmlAttr.class "panelTitle" ] [ text "Produktion" ]
+                , p [ HtmlAttr.class "panelDescription" ]
+                    [ text "Der Bedarf entspricht immer der Anzahl der Villager." ]
+                , div [ HtmlAttr.class "productionStack" ]
+                    [ resourceRow
+                        "Essen"
+                        (String.fromInt model.foodPerTick)
+                        (String.fromInt (List.length model.villagers))
+                        (model.foodPerTick >= List.length model.villagers)
+                    , resourceRow
+                        "Wasser"
+                        (String.fromInt model.waterPerTick)
+                        (String.fromInt (List.length model.villagers))
+                        (model.waterPerTick >= List.length model.villagers)
+                    ]
                 ]
 
         BuildingsTab ->
@@ -261,6 +372,8 @@ tabFromUrl url =
     case url.path of
         "/buildings" ->
             BuildingsTab
+        "/production" ->
+            ProductionTab
         "/jobs" ->
             JobsTab
         _ ->
@@ -291,28 +404,28 @@ rowName : Int -> String
 rowName rowIndex =
     case rowIndex of
         0 ->
-            "Häuser"
+            "Häuser (20)"
 
         1 ->
-            "Farmen"
+            "Farmen (50)"
 
         2 ->
-            "Schulen"
+            "Schulen (75)"
 
         3 ->
-            "Kaufhäuser"
+            "Kaufhäuser (100)"
 
         4 ->
-            "Tavernen"
+            "Tavernen (60)"
 
         5 ->
-            "Brunnen"
+            "Brunnen (40)"
 
         6 ->
-            "Getreidespeicher"
+            "Getreidespeicher (65)"
 
         7 ->
-            "Bäckereien"
+            "Bäckereien (55)"
 
         _ ->
             "Row " ++ String.fromInt (rowIndex + 1)
@@ -324,5 +437,43 @@ statCard label value =
         [ span [ HtmlAttr.class "statLabel" ]
             [ text label ]
         , span [ HtmlAttr.class "statValue" ]
+            [ text value ]
+        ]
+
+
+resourceRow : String -> String -> String -> Bool -> Html Msg
+resourceRow label productionValue demandValue isSurplus =
+    div [ HtmlAttr.class "resourceRow" ]
+        [ p [ HtmlAttr.class "resourceRowTitle" ] [ text label ]
+        , div [ HtmlAttr.class "resourceRowGrid" ]
+            [ resourceMetric "Produktion" productionValue
+                isSurplus
+            , demandMetric "Bedarf" demandValue
+            ]
+        ]
+
+
+resourceMetric : String -> String -> Bool -> Html Msg
+resourceMetric label value isHighlighted =
+    div
+        [ HtmlAttr.classList
+            [ ( "resourceMetric", True )
+            , ( "resourceMetricSurplus", isHighlighted )
+            , ( "resourceMetricDeficit", not isHighlighted )
+            ]
+        ]
+        [ span [ HtmlAttr.class "resourceMetricLabel" ]
+            [ text label ]
+        , span [ HtmlAttr.class "resourceMetricValue" ]
+            [ text value ]
+        ]
+
+
+demandMetric : String -> String -> Html Msg
+demandMetric label value =
+    div [ HtmlAttr.class "resourceMetric" ]
+        [ span [ HtmlAttr.class "resourceMetricLabel" ]
+            [ text label ]
+        , span [ HtmlAttr.class "resourceMetricValue" ]
             [ text value ]
         ]

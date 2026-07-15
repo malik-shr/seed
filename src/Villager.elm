@@ -10,6 +10,7 @@ module Villager exposing
     , deathListGenerator
     , giveBirth
     , useFood
+    , useWater
     )
 
 import Svg exposing (Svg, text_)
@@ -30,6 +31,7 @@ type alias Villager =
     , vy : Float
     , age : Int
     , food : Int
+    , water : Int
     , gender : Int 
     , isPregnant : Bool
     , pregnantDuration : Int 
@@ -75,6 +77,13 @@ useFood villager  =
     }
 
 
+useWater : Villager -> Villager
+useWater villager =
+    { villager
+        | water = villager.water - 1
+    }
+
+
 
 moveVillager : Villager -> Villager
 moveVillager villager =
@@ -117,6 +126,7 @@ villagerGenerator id =
             , vy = vy
             , age = 0
             , food = 0
+            , water = 0
             , gender = gender
             , isPregnant = False
             , pregnantDuration = 0
@@ -140,13 +150,13 @@ randomVelocity =
         (Random.float 0.5 1)
         (Random.int 0 1)
 
-deathChance : Villager -> Float
-deathChance villager =
+deathChance : Int -> Villager -> Float
+deathChance lifeExpectancyBonus villager =
     let
         age =
-            tickInYears villager.age
+            tickInYears villager.age - lifeExpectancyBonus
     in
-    if villager.food < 0 then 
+    if villager.food < 0 || villager.water < 0 then 
         0.5
     else 
         if age < 50 then
@@ -158,11 +168,11 @@ deathChance villager =
         else
             0.005
 
-deathGenerator : Villager -> Random.Generator (Maybe Villager)
-deathGenerator villager =
+deathGenerator : Int -> Villager -> Random.Generator (Maybe Villager)
+deathGenerator lifeExpectancyBonus villager =
     Random.map
         (\chance ->
-            if chance < deathChance villager then
+            if chance < deathChance lifeExpectancyBonus villager then
                 Nothing
 
             else
@@ -170,8 +180,8 @@ deathGenerator villager =
         )
         (Random.float 0 1)
 
-deathListGenerator : List Villager -> Random.Generator (List Villager)
-deathListGenerator villagers =
+deathListGenerator : Int -> List Villager -> Random.Generator (List Villager)
+deathListGenerator lifeExpectancyBonus villagers =
     List.foldr
         (\villager acc ->
             Random.map2
@@ -183,7 +193,7 @@ deathListGenerator villagers =
                         Nothing ->
                             list
                 )
-                (deathGenerator villager)
+                (deathGenerator lifeExpectancyBonus villager)
                 acc
         )
         (Random.constant [])

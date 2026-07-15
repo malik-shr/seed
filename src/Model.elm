@@ -8,6 +8,7 @@ import Url exposing (Url)
 
 type SidebarTab
     = StatisticsTab
+    | ProductionTab
     | JobsTab
     | BuildingsTab
 
@@ -16,6 +17,11 @@ type alias Model =
     , villagers : List Villager
     , nextVillagerId : Int
     , food : Int
+    , foodPerTick : Int
+    , water : Int
+    , waterPerTick : Int 
+    , money : Int 
+    , moneyPerTick : Int 
     , tick : Int
     , pregnancyChances : List Int
     , newVillager : Villager
