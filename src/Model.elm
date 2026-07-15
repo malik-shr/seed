@@ -32,6 +32,19 @@ type alias Model =
     , draggedBuilding : Maybe Int
     , tileImage : String
     , buildingImages : List String
+    , appBaseUrl : String
+    , postgrestUrl : String
+    , postgrestSchema : String
+    , postgrestToken : String
+    , postgrestUsername : String
+    , postgrestPassword : String
+    , authInProgress : Bool
+    , authMessage : Maybe String
+    , saveId : Maybe String
+    , savePersisted : Bool
+    , saving : Bool
+    , loadingSave : Bool
+    , persistenceMessage : Maybe String
     , key : Nav.Key
     , url : Url
     , worldCalculationPending : Bool

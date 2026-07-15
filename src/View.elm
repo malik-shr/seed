@@ -1,18 +1,19 @@
 module View exposing (view, sidebarContent)
 
 import Constants exposing (gridCellCount, gridCellHeight, gridCellWidth, gridColumns, gridRows)
-import Html exposing (Html, a, button, div, p, span, text)
+import Jobs exposing (allJobRows, assignedWorkerCount, jobCapacity, jobEffectSummary, jobName)
+import Html exposing (Html, a, button, div, input, p, span, text)
 import Html.Attributes as HtmlAttr
-import Html.Events exposing (custom, on)
+import Html.Events exposing (custom, on, onInput)
 import Json.Decode as Decode
 import Model exposing (Model, SidebarTab(..))
 import Msg exposing (Msg(..))
+import Route exposing (shareUrl)
+import Villager exposing (Villager, viewVillager)
 import Svg exposing (Svg, g, image, rect, svg)
 import Svg.Attributes as SvgAttr
 import Utils exposing (numberToMonth, tickInYears)
-import Villager exposing (viewVillager)
-import Url
-import List exposing (length)
+import List
 
 
 view : Model -> Html Msg
@@ -140,8 +141,14 @@ onDrop msg =
 dashboard : Model -> Html Msg
 dashboard model =
     let
+        population =
+            List.length model.villagers
+
+        routeInfo =
+            Route.fromUrl model.url
+
         levelInfo =
-            populationLevelInfo (List.length model.villagers)
+            populationLevelInfo population
 
         day =
             modBy 30 model.tick + 1
@@ -153,8 +160,7 @@ dashboard model =
             tickInYears model.tick
     in
     div [ HtmlAttr.class "dashboard" ]
-        [ levelBar levelInfo
-        , div [ HtmlAttr.class "dashboardHeader" ]
+        [ div [ HtmlAttr.class "dashboardHeader" ]
             [ p [ HtmlAttr.class "eyebrow" ]
                 [ text "Seed Simulation" ]
             , p [ HtmlAttr.class "dateText" ]
@@ -167,8 +173,114 @@ dashboard model =
                     )
                 ]
             ]
+        , dashboardSummary model population
+        , authPanel model
+        , savePanel model routeInfo.tab
+        , levelBar levelInfo
         , sidebarNavigation model
         , sidebarContent model
+        ]
+
+
+dashboardSummary : Model -> Int -> Html Msg
+dashboardSummary model population =
+    div [ HtmlAttr.class "dashboardSummary" ]
+        [ summaryCard "Bevölkerung" (String.fromInt population)
+        , summaryCard "Geld" (String.fromInt model.money)
+        ]
+
+
+authPanel : Model -> Html Msg
+authPanel model =
+    div [ HtmlAttr.class "authPanel" ]
+        [ div [ HtmlAttr.class "authFieldRow" ]
+            [ input
+                [ HtmlAttr.class "authInput"
+                , HtmlAttr.placeholder "Nutzername"
+                , HtmlAttr.value model.postgrestUsername
+                , onInput LoginUsernameChanged
+                ]
+                []
+            , input
+                [ HtmlAttr.class "authInput"
+                , HtmlAttr.placeholder "Passwort"
+                , HtmlAttr.type_ "password"
+                , HtmlAttr.value model.postgrestPassword
+                , onInput LoginPasswordChanged
+                ]
+                []
+            ]
+        , button
+            [ HtmlAttr.class "authButton"
+            , HtmlAttr.disabled model.authInProgress
+            , on "click" (Decode.succeed LoginRequested)
+            ]
+            [ text
+                (if model.authInProgress then
+                    "Verbinde..."
+
+                 else
+                    "Anmelden"
+                )
+            ]
+        , case model.authMessage of
+            Just message ->
+                p [ HtmlAttr.class "saveMessage" ] [ text message ]
+
+            Nothing ->
+                text ""
+        ]
+
+
+savePanel : Model -> SidebarTab -> Html Msg
+savePanel model activeTab =
+    let
+        shareLink =
+            case model.saveId of
+                Just saveId ->
+                    shareUrl model.appBaseUrl (Just saveId) activeTab
+
+                Nothing ->
+                    ""
+
+        buttonLabel =
+            if model.saving then
+                "Speichere..."
+
+            else
+                "Spiel speichern"
+    in
+    div [ HtmlAttr.class "savePanel" ]
+        [ button
+            [ HtmlAttr.class "saveButton"
+            , HtmlAttr.disabled (model.saving || model.loadingSave)
+            , on "click" (Decode.succeed SaveRequested)
+            ]
+            [ text buttonLabel ]
+        , case model.saveId of
+            Just _ ->
+                a [ HtmlAttr.class "saveLink", HtmlAttr.href shareLink ]
+                    [ text shareLink ]
+
+            Nothing ->
+                span [ HtmlAttr.class "saveLinkPlaceholder" ]
+                    [ text "Noch kein Link gespeichert" ]
+        , case model.persistenceMessage of
+            Just message ->
+                p [ HtmlAttr.class "saveMessage" ] [ text message ]
+
+            Nothing ->
+                text ""
+        ]
+
+
+summaryCard : String -> String -> Html Msg
+summaryCard label value =
+    div [ HtmlAttr.class "summaryCard" ]
+        [ span [ HtmlAttr.class "summaryLabel" ]
+            [ text label ]
+        , span [ HtmlAttr.class "summaryValue" ]
+            [ text value ]
         ]
 
 
@@ -260,18 +372,18 @@ sidebarNavigation : Model -> Html Msg
 sidebarNavigation model =
     let
         activeTab =
-            tabFromUrl model.url
+            Route.fromUrl model.url
     in
     div [ HtmlAttr.class "sidebarTabs", HtmlAttr.attribute "role" "tablist" ]
-        [ sidebarTabButton activeTab StatisticsTab "Statistiken"
-        , sidebarTabButton activeTab ProductionTab "Produktion"
-        , sidebarTabButton activeTab JobsTab "Jobs"
-        , sidebarTabButton activeTab BuildingsTab "Häuser"
+        [ sidebarTabButton model activeTab.tab StatisticsTab "Statistiken"
+        , sidebarTabButton model activeTab.tab ProductionTab "Produktion"
+        , sidebarTabButton model activeTab.tab JobsTab "Jobs"
+        , sidebarTabButton model activeTab.tab BuildingsTab "Häuser"
         ]
 
 
-sidebarTabButton : SidebarTab -> SidebarTab -> String -> Html Msg
-sidebarTabButton activeTab tab label =
+sidebarTabButton : Model -> SidebarTab -> SidebarTab -> String -> Html Msg
+sidebarTabButton model activeTab tab label =
     let
         isActive =
             activeTab == tab
@@ -289,27 +401,19 @@ sidebarTabButton activeTab tab label =
              else
                 "false"
             )
-        , HtmlAttr.href (sidebarTabUrl tab)
+        , HtmlAttr.href (sidebarTabUrl model tab)
         ]
         [ text label ]
 
 
-sidebarTabUrl : SidebarTab -> String
-sidebarTabUrl tab =
-    case tab of
-        StatisticsTab ->
-            "/statistics"
-        ProductionTab ->
-            "/production"
-        JobsTab ->
-            "/jobs"
-        BuildingsTab ->
-            "/buildings"
+sidebarTabUrl : Model -> SidebarTab -> String
+sidebarTabUrl model tab =
+    shareUrl model.appBaseUrl model.saveId tab
 
 
 sidebarContent : Model -> Html Msg
 sidebarContent model =
-    case tabFromUrl model.url of
+    case (Route.fromUrl model.url).tab of
         StatisticsTab ->
             div [ HtmlAttr.class "statsGrid", HtmlAttr.attribute "role" "tabpanel" ]
                 [ statCard "Villagers" (String.fromInt (List.length model.villagers))
@@ -354,31 +458,14 @@ sidebarContent model =
                     )
                 ]
 
-        
         JobsTab ->
-            div [ HtmlAttr.class "housesPanel", HtmlAttr.attribute "role" "tabpanel" ]
-                [ p [ HtmlAttr.class "panelTitle" ] [ text "Gebäude bauen" ]
+            div [ HtmlAttr.class "jobsPanel", HtmlAttr.attribute "role" "tabpanel" ]
+                [ p [ HtmlAttr.class "panelTitle" ] [ text "Jobs zuweisen" ]
                 , p [ HtmlAttr.class "panelDescription" ]
-                    [ text "Wähle eine Gebäudereihe aus, um das Dorf zu erweitern." ]
-                , div [ HtmlAttr.class "rowButtonGrid" ]
-                    (List.range 0 (gridRows - 1)
-                        |> List.map (rowFillButton model)
-                    )
+                    [ text "Weise Villager vorhandenen Gebäuden zu. Jede Zuweisung gibt dem passenden Stat +1 pro Tick." ]
+                , div [ HtmlAttr.class "jobCardGrid" ]
+                    (allJobRows |> List.map (jobCard model))
                 ]
-
-
-tabFromUrl : Url.Url -> SidebarTab
-tabFromUrl url =
-    case url.path of
-        "/buildings" ->
-            BuildingsTab
-        "/production" ->
-            ProductionTab
-        "/jobs" ->
-            JobsTab
-        _ ->
-            StatisticsTab
-
 
 
 buildingImage : Model -> Int -> String
@@ -429,6 +516,103 @@ rowName rowIndex =
 
         _ ->
             "Row " ++ String.fromInt (rowIndex + 1)
+
+
+jobCard : Model -> Int -> Html Msg
+jobCard model rowIndex =
+    let
+        capacity =
+            jobCapacity rowIndex model.filledGridRows
+
+        assignedVillagers =
+            model.villagers
+                |> List.filter (\villager -> villager.job == Just rowIndex)
+
+        availableVillagers =
+            model.villagers
+                |> List.filter (\villager -> villager.job == Nothing)
+
+        assignedCount =
+            min capacity (assignedWorkerCount rowIndex model.villagers)
+
+        canAssign =
+            capacity > assignedCount
+    in
+    div [ HtmlAttr.class "jobCard" ]
+        [ div [ HtmlAttr.class "jobCardHeader" ]
+            [ span [ HtmlAttr.class "jobCardTitle" ]
+                [ text (jobName rowIndex) ]
+            , span [ HtmlAttr.class "jobCardMeta" ]
+                [ text
+                    (String.fromInt assignedCount
+                        ++ " / "
+                        ++ String.fromInt capacity
+                        ++ " Arbeiter"
+                    )
+                ]
+            ]
+        , p [ HtmlAttr.class "jobCardDescription" ]
+            [ text (jobEffectSummary rowIndex) ]
+        , div [ HtmlAttr.class "jobVillagerGroups" ]
+            [ jobVillagerGroup "Zugewiesen" assignedVillagers rowIndex True True
+            , jobVillagerGroup "Verfügbar" availableVillagers rowIndex canAssign False
+            ]
+        ]
+
+
+jobVillagerGroup : String -> List Villager -> Int -> Bool -> Bool -> Html Msg
+jobVillagerGroup title villagers rowIndex canAssign isAssignedGroup =
+    div [ HtmlAttr.class "jobVillagerGroup" ]
+        [ p [ HtmlAttr.class "jobVillagerGroupTitle" ]
+            [ text title ]
+        , div [ HtmlAttr.class "jobVillagerList" ]
+            (case villagers of
+                [] ->
+                    [ span [ HtmlAttr.class "jobEmptyState" ]
+                        [ text
+                            (if isAssignedGroup then
+                                "Noch niemand zugewiesen"
+
+                             else
+                                "Keine freien Villager"
+                            )
+                        ]
+                    ]
+
+                _ ->
+                    villagers
+                        |> List.map (jobVillagerChip rowIndex canAssign isAssignedGroup)
+            )
+        ]
+
+
+jobVillagerChip : Int -> Bool -> Bool -> Villager -> Html Msg
+jobVillagerChip rowIndex canAssign isAssignedGroup villager =
+    let
+        buttonLabel =
+            if isAssignedGroup then
+                "Entfernen"
+
+            else
+                "Zuweisen"
+
+        isDisabled =
+            not isAssignedGroup && not canAssign
+    in
+    div [ HtmlAttr.class "jobVillagerChip" ]
+        [ span [ HtmlAttr.class "jobVillagerName" ]
+            [ text ("Villager " ++ String.fromInt villager.id) ]
+        , button
+            [ HtmlAttr.class "jobVillagerButton"
+            , HtmlAttr.classList
+                [ ( "jobVillagerButtonAssigned", isAssignedGroup )
+                , ( "jobVillagerButtonDisabled", isDisabled )
+                ]
+            , HtmlAttr.disabled isDisabled
+            , on "click" (Decode.succeed (ToggleJobAssignment villager.id rowIndex))
+            ]
+            [ text buttonLabel ]
+        ]
 
 
 statCard : String -> String -> Html Msg
