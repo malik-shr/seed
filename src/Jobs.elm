@@ -8,10 +8,6 @@ module Jobs exposing
     , jobName
     )
 
-import List exposing (length)
-import Villager exposing (Villager)
-
-
 type alias JobEffect =
     { food : Int
     , water : Int
@@ -131,10 +127,17 @@ jobCapacity rowIndex filledGridRows =
         |> List.drop rowIndex
         |> List.head
         |> Maybe.withDefault 0
+        |> (\buildingCount -> buildingCount * jobsPerBuilding)
 
 
-assignedWorkerCount : Int -> List Villager -> Int
-assignedWorkerCount rowIndex villagers =
-    villagers
-        |> List.filter (\villager -> villager.job == Just rowIndex)
-        |> length
+assignedWorkerCount : Int -> List Int -> Int
+assignedWorkerCount rowIndex jobAssignments =
+    jobAssignments
+        |> List.drop rowIndex
+        |> List.head
+        |> Maybe.withDefault 0
+
+
+jobsPerBuilding : Int
+jobsPerBuilding =
+    5

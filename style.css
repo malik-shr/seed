@@ -15,6 +15,12 @@ body {
   overflow: hidden;
 }
 
+.gameColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .gameCanvas {
   display: block;
   background: #eef5e5;
@@ -83,11 +89,47 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 18px;
   padding: 14px;
   border-radius: 14px;
   background: #f7f9f4;
   border: 1px solid #dfe8d7;
+}
+
+.savePanel {
+  width: 800px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(21, 28, 21, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 20;
+}
+
+.modalCard {
+  position: relative;
+  width: min(520px, 100%);
+  background: white;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.24);
+  border: 1px solid #dfe8d7;
+}
+
+.modalCloseButton {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  border: 0;
+  background: transparent;
+  font-size: 28px;
+  line-height: 1;
+  color: #667061;
+  cursor: pointer;
 }
 
 .authFieldRow {
@@ -299,6 +341,13 @@ body {
   margin-top: 16px;
 }
 
+.jobActionRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .jobCardGrid {
   display: flex;
   flex-direction: column;
@@ -335,52 +384,6 @@ body {
   color: #52604f;
   font-size: 14px;
   line-height: 1.45;
-}
-
-.jobVillagerGroups {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.jobVillagerGroup {
-  padding: 12px;
-  border-radius: 12px;
-  background: white;
-  border: 1px solid #e1e8da;
-}
-
-.jobVillagerGroupTitle {
-  margin: 0 0 10px;
-  color: #1f2a1f;
-  font-size: 13px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.jobVillagerList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.jobVillagerChip {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: #f7f9f4;
-  border: 1px solid #e1e8da;
-}
-
-.jobVillagerName {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1f2a1f;
 }
 
 .jobVillagerButton {

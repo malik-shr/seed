@@ -15,13 +15,14 @@ type SidebarTab
 type alias Model =
     { time : Float
     , villagers : List Villager
+    , jobAssignments : List Int
     , nextVillagerId : Int
     , food : Int
     , foodPerTick : Int
     , water : Int
     , waterPerTick : Int 
-    , money : Int 
-    , moneyPerTick : Int 
+    , money : Float
+    , moneyPerTick : Float 
     , tick : Int
     , pregnancyChances : List Int
     , newVillager : Villager
@@ -40,6 +41,7 @@ type alias Model =
     , postgrestPassword : String
     , authInProgress : Bool
     , authMessage : Maybe String
+    , authPromptOpen : Bool
     , saveId : Maybe String
     , savePersisted : Bool
     , saving : Bool
@@ -48,4 +50,5 @@ type alias Model =
     , key : Nav.Key
     , url : Url
     , worldCalculationPending : Bool
+    , worldCalculationId : Int
     }

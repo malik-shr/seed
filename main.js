@@ -1,14 +1,14 @@
 import "./style.css";
 import { Elm } from "./src/Main.elm";
 import tileImage from "./src/assets/logo.png";
-import houseImage from "./haus.png";
-import farmImage from "./farm.png";
-import schoolImage from "./schule.png";
-import storeImage from "./kaufhaus.png";
-import tavernImage from "./taverne.png";
-import wellImage from "./brunnen.png";
-import granaryImage from "./getreidespeicher.png";
-import bakeryImage from "./baeckerei.png";
+import houseImage from "./src/assets/haus.png";
+import farmImage from "./src/assets/farm.png";
+import schoolImage from "./src/assets/schule.png";
+import storeImage from "./src/assets/kaufhaus.png";
+import tavernImage from "./src/assets/taverne.png";
+import wellImage from "./src/assets/brunnen.png";
+import granaryImage from "./src/assets/getreidespeicher.png";
+import bakeryImage from "./src/assets/baeckerei.png";
 
 if (process.env.NODE_ENV === "development") {
     const ElmDebugTransform = await import("elm-debug-transformer")

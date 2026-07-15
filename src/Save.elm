@@ -17,10 +17,11 @@ import Villager exposing (Villager)
 type alias SavedGameState =
     { time : Float
     , villagers : List Villager
+    , jobAssignments : List Int
     , nextVillagerId : Int
     , food : Int
     , water : Int
-    , money : Int
+    , money : Float
     , tick : Int
     , pregnancyChances : List Int
     , newVillager : Villager
@@ -40,6 +41,7 @@ savedGameStateFromModel : Model -> SavedGameState
 savedGameStateFromModel model =
     { time = model.time
     , villagers = model.villagers
+    , jobAssignments = model.jobAssignments
     , nextVillagerId = model.nextVillagerId
     , food = model.food
     , water = model.water
@@ -58,6 +60,7 @@ applySavedGameState savedGameState model =
     { model
         | time = savedGameState.time
         , villagers = savedGameState.villagers
+        , jobAssignments = savedGameState.jobAssignments
         , nextVillagerId = savedGameState.nextVillagerId
         , food = savedGameState.food
         , water = savedGameState.water
@@ -76,10 +79,11 @@ savedGameStateEncoder savedGameState =
     Encode.object
         [ ( "time", Encode.float savedGameState.time )
         , ( "villagers", Encode.list villagerEncoder savedGameState.villagers )
+        , ( "jobAssignments", Encode.list Encode.int savedGameState.jobAssignments )
         , ( "nextVillagerId", Encode.int savedGameState.nextVillagerId )
         , ( "food", Encode.int savedGameState.food )
         , ( "water", Encode.int savedGameState.water )
-        , ( "money", Encode.int savedGameState.money )
+        , ( "money", Encode.float savedGameState.money )
         , ( "tick", Encode.int savedGameState.tick )
         , ( "pregnancyChances", Encode.list Encode.int savedGameState.pregnancyChances )
         , ( "newVillager", villagerEncoder savedGameState.newVillager )
@@ -92,10 +96,11 @@ savedGameStateEncoder savedGameState =
 savedGameStateDecoder : Decoder SavedGameState
 savedGameStateDecoder =
     Decode.map8
-        (\time villagers nextVillagerId food water money tick pregnancyChances ->
-            \newVillager deathCount buildingGrid draggedBuilding ->
+        (\time villagers jobAssignments nextVillagerId food water money tick ->
+            \pregnancyChances newVillager deathCount buildingGrid draggedBuilding ->
                 { time = time
                 , villagers = villagers
+                , jobAssignments = jobAssignments
                 , nextVillagerId = nextVillagerId
                 , food = food
                 , water = water
@@ -110,18 +115,19 @@ savedGameStateDecoder =
         )
         (Decode.field "time" Decode.float)
         (Decode.field "villagers" (Decode.list villagerDecoder))
+        (jobAssignmentsDecoder)
         (Decode.field "nextVillagerId" Decode.int)
         (Decode.field "food" Decode.int)
         (Decode.field "water" Decode.int)
-        (Decode.field "money" Decode.int)
+        (Decode.field "money" Decode.float)
         (Decode.field "tick" Decode.int)
-        (Decode.field "pregnancyChances" (Decode.list Decode.int))
         |> Decode.andThen
             (\build ->
-                Decode.map4
-                    (\newVillager deathCount buildingGrid draggedBuilding ->
-                        build newVillager deathCount buildingGrid draggedBuilding
+                Decode.map5
+                    (\pregnancyChances newVillager deathCount buildingGrid draggedBuilding ->
+                        build pregnancyChances newVillager deathCount buildingGrid draggedBuilding
                     )
+                    (Decode.field "pregnancyChances" (Decode.list Decode.int))
                     (Decode.field "newVillager" villagerDecoder)
                     (Decode.field "deathCount" Decode.int)
                     (Decode.field "buildingGrid" (Decode.list maybeIntDecoder))
@@ -207,3 +213,23 @@ maybeIntEncoder maybeInt =
 maybeIntDecoder : Decoder (Maybe Int)
 maybeIntDecoder =
     Decode.nullable Decode.int
+
+
+jobAssignmentsDecoder : Decoder (List Int)
+jobAssignmentsDecoder =
+    Decode.oneOf
+        [ Decode.field "jobAssignments" (Decode.list Decode.int)
+        , Decode.field "villagers" (Decode.list villagerDecoder)
+            |> Decode.map deriveJobAssignments
+        ]
+
+
+deriveJobAssignments : List Villager -> List Int
+deriveJobAssignments villagers =
+    List.range 0 7
+        |> List.map
+            (\rowIndex ->
+                villagers
+                    |> List.filter (\villager -> villager.job == Just rowIndex)
+                    |> List.length
+            )

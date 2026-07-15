@@ -16,17 +16,20 @@ type Msg
     = Tick Float
     | GenNewVillagerValues 
     | NewVillager Villager
-    | WorldCalculated (List Villager)
+    | WorldCalculated Int (List Villager)
     | FeedVillagers 
-    | ToggleJobAssignment Int Int
     | LoginUsernameChanged String
     | LoginPasswordChanged String
     | LoginRequested
     | PostgrestTokenReceived Decode.Value
+    | CloseAuthPrompt
     | SaveIdGenerated String
+    | LoadRequested
     | SaveRequested
     | SaveCompleted (Result String ())
     | SaveLoaded (Result String (List SavedGameRow))
+    | AssignJobOne Int
+    | ClearJob Int
     | StartDraggingBuilding Int
     | DropBuilding Int
     | StopDraggingBuilding

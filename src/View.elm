@@ -14,15 +14,21 @@ import Villager exposing (Villager, viewVillager)
 import Svg exposing (Svg, g, image, rect, svg)
 import Svg.Attributes as SvgAttr
 import Url
+import String
 import Utils exposing (numberToMonth, tickInYears)
 import List
+import Utils exposing (roundTo2)
 
 
 view : Model -> Html Msg
 view model =
     div [ HtmlAttr.class "gameWrapper" ]
-        [ game model
+        [ div [ HtmlAttr.class "gameColumn" ]
+            [ game model
+            , gameControls model
+            ]
         , dashboard model
+        , loginModal model
         ]
 
 
@@ -146,9 +152,6 @@ dashboard model =
         population =
             List.length model.villagers
 
-        routeInfo =
-            Route.fromUrl model.url
-
         levelInfo =
             populationLevelInfo population
 
@@ -163,7 +166,10 @@ dashboard model =
     in
     div [ HtmlAttr.class "dashboard" ]
         [ div [ HtmlAttr.class "dashboardHeader" ]
-            [ p [ HtmlAttr.class "eyebrow" ]
+        
+            [ 
+            levelBar levelInfo
+            , p [ HtmlAttr.class "eyebrow" ]
                 [ text "Seed Simulation" ]
             , p [ HtmlAttr.class "dateText" ]
                 [ text
@@ -176,9 +182,7 @@ dashboard model =
                 ]
             ]
         , dashboardSummary model population
-        , authPanel model
-        , savePanel model routeInfo.tab
-        , levelBar levelInfo
+        
         , sidebarNavigation model
         , sidebarContent model
         ]
@@ -188,59 +192,20 @@ dashboardSummary : Model -> Int -> Html Msg
 dashboardSummary model population =
     div [ HtmlAttr.class "dashboardSummary" ]
         [ summaryCard "Bevölkerung" (String.fromInt population)
-        , summaryCard "Geld" (String.fromInt model.money)
+        , summaryCard "Geld" (String.fromFloat (roundTo2 model.money))
         ]
 
 
-authPanel : Model -> Html Msg
-authPanel model =
-    div [ HtmlAttr.class "authPanel" ]
-        [ div [ HtmlAttr.class "authFieldRow" ]
-            [ input
-                [ HtmlAttr.class "authInput"
-                , HtmlAttr.placeholder "Nutzername"
-                , HtmlAttr.value model.postgrestUsername
-                , onInput LoginUsernameChanged
-                ]
-                []
-            , input
-                [ HtmlAttr.class "authInput"
-                , HtmlAttr.placeholder "Passwort"
-                , HtmlAttr.type_ "password"
-                , HtmlAttr.value model.postgrestPassword
-                , onInput LoginPasswordChanged
-                ]
-                []
-            ]
-        , button
-            [ HtmlAttr.class "authButton"
-            , HtmlAttr.disabled model.authInProgress
-            , on "click" (Decode.succeed LoginRequested)
-            ]
-            [ text
-                (if model.authInProgress then
-                    "Verbinde..."
-
-                 else
-                    "Anmelden"
-                )
-            ]
-        , case model.authMessage of
-            Just message ->
-                p [ HtmlAttr.class "saveMessage" ] [ text message ]
-
-            Nothing ->
-                text ""
-        ]
-
-
-savePanel : Model -> SidebarTab -> Html Msg
-savePanel model activeTab =
+gameControls : Model -> Html Msg
+gameControls model =
     let
+        routeInfo =
+            Route.fromUrl model.url
+
         shareLink =
             case model.saveId of
                 Just saveId ->
-                    shareUrl model.appBaseUrl (Just saveId) activeTab
+                    shareUrl model.appBaseUrl (Just saveId) routeInfo.tab
 
                 Nothing ->
                     ""
@@ -259,7 +224,13 @@ savePanel model activeTab =
             , on "click" (Decode.succeed SaveRequested)
             ]
             [ text buttonLabel ]
-        , case model.saveId of
+        , button
+            [ HtmlAttr.class "saveButton"
+            , HtmlAttr.disabled (model.loadingSave || String.isEmpty model.postgrestToken || routeInfo.saveId == Nothing)
+            , on "click" (Decode.succeed LoadRequested)
+            ]
+            [ text "Spiel laden" ]
+        , case routeInfo.saveId of
             Just _ ->
                 a [ HtmlAttr.class "saveLink", HtmlAttr.href shareLink ]
                     [ text shareLink ]
@@ -274,6 +245,62 @@ savePanel model activeTab =
             Nothing ->
                 text ""
         ]
+
+
+loginModal : Model -> Html Msg
+loginModal model =
+    if model.authPromptOpen then
+        div [ HtmlAttr.class "modalBackdrop" ]
+            [ div [ HtmlAttr.class "modalCard" ]
+                [ button
+                    [ HtmlAttr.class "modalCloseButton"
+                    , on "click" (Decode.succeed CloseAuthPrompt)
+                    ]
+                    [ text "×" ]
+                , p [ HtmlAttr.class "panelTitle" ] [ text "Anmelden" ]
+                , p [ HtmlAttr.class "panelDescription" ]
+                    [ text "Bitte melde dich mit deinem Datenbank-User an, bevor du speichern oder laden kannst." ]
+                , div [ HtmlAttr.class "authFieldRow" ]
+                    [ input
+                        [ HtmlAttr.class "authInput"
+                        , HtmlAttr.placeholder "Nutzername"
+                        , HtmlAttr.value model.postgrestUsername
+                        , onInput LoginUsernameChanged
+                        ]
+                        []
+                    , input
+                        [ HtmlAttr.class "authInput"
+                        , HtmlAttr.placeholder "Passwort"
+                        , HtmlAttr.type_ "password"
+                        , HtmlAttr.value model.postgrestPassword
+                        , onInput LoginPasswordChanged
+                        ]
+                        []
+                    ]
+                , button
+                    [ HtmlAttr.class "authButton"
+                    , HtmlAttr.disabled model.authInProgress
+                    , on "click" (Decode.succeed LoginRequested)
+                    ]
+                    [ text
+                        (if model.authInProgress then
+                            "Verbinde..."
+
+                         else
+                            "Anmelden"
+                        )
+                    ]
+                , case model.authMessage of
+                    Just message ->
+                        p [ HtmlAttr.class "saveMessage" ] [ text message ]
+
+                    Nothing ->
+                        text ""
+                ]
+            ]
+
+    else
+        text ""
 
 
 summaryCard : String -> String -> Html Msg
@@ -419,8 +446,7 @@ sidebarContent model =
     case (Route.fromUrl model.url).tab of
         StatisticsTab ->
             div [ HtmlAttr.class "statsGrid", HtmlAttr.attribute "role" "tabpanel" ]
-                [ statCard "Villagers" (String.fromInt (List.length model.villagers))
-                , statCard "Dead" (String.fromInt model.deathCount)
+                [ statCard "Dead" (String.fromInt model.deathCount)
                 , statCard "Female" (String.fromInt model.statistics.femaleCount)
                 , statCard "Male" (String.fromInt model.statistics.maleCount)
                 , statCard "Children" (String.fromInt model.statistics.childrenCount)
@@ -428,14 +454,13 @@ sidebarContent model =
                 , statCard "Pregnant" (String.fromInt model.statistics.pregnantCount)
                 , statCard "Fertile Female" (String.fromInt model.statistics.fertileFemaleCount)
                 , statCard "Average Age" (String.fromFloat model.statistics.averageAge)
-                , statCard "Geld" (String.fromInt model.money)
                 ]
 
         ProductionTab ->
             div [ HtmlAttr.class "productionPanel", HtmlAttr.attribute "role" "tabpanel" ]
                 [ p [ HtmlAttr.class "panelTitle" ] [ text "Produktion" ]
                 , p [ HtmlAttr.class "panelDescription" ]
-                    [ text "Der Bedarf entspricht immer der Anzahl der Villager." ]
+                    [ text "Hier siehst du die laufende Produktion pro Tick." ]
                 , div [ HtmlAttr.class "productionStack" ]
                     [ resourceRow
                         "Essen"
@@ -447,6 +472,11 @@ sidebarContent model =
                         (String.fromInt model.waterPerTick)
                         (String.fromInt (List.length model.villagers))
                         (model.waterPerTick >= List.length model.villagers)
+                    , resourceRow
+                        "Geld"
+                        (String.fromFloat (roundTo2 model.moneyPerTick))
+                        "—"
+                        True
                     ]
                 ]
 
@@ -536,19 +566,11 @@ jobCard model rowIndex =
         capacity =
             jobCapacity rowIndex model.filledGridRows
 
-        assignedVillagers =
-            model.villagers
-                |> List.filter (\villager -> villager.job == Just rowIndex)
-
-        availableVillagers =
-            model.villagers
-                |> List.filter (\villager -> villager.job == Nothing)
-
         assignedCount =
-            min capacity (assignedWorkerCount rowIndex model.villagers)
+            min capacity (assignedWorkerCount rowIndex model.jobAssignments)
 
-        canAssign =
-            capacity > assignedCount
+        freeAdults =
+            freeAdultCount model
     in
     div [ HtmlAttr.class "jobCard" ]
         [ div [ HtmlAttr.class "jobCardHeader" ]
@@ -559,72 +581,44 @@ jobCard model rowIndex =
                     (String.fromInt assignedCount
                         ++ " / "
                         ++ String.fromInt capacity
-                        ++ " Arbeiter"
+                        ++ " Arbeitsplätze"
                     )
                 ]
             ]
         , p [ HtmlAttr.class "jobCardDescription" ]
-            [ text (jobEffectSummary rowIndex) ]
-        , div [ HtmlAttr.class "jobVillagerGroups" ]
-            [ jobVillagerGroup "Zugewiesen" assignedVillagers rowIndex True True
-            , jobVillagerGroup "Verfügbar" availableVillagers rowIndex canAssign False
+            [ text
+                (jobEffectSummary rowIndex
+                    ++ " · Freie Erwachsene: "
+                    ++ String.fromInt freeAdults
+                )
             ]
-        ]
-
-
-jobVillagerGroup : String -> List Villager -> Int -> Bool -> Bool -> Html Msg
-jobVillagerGroup title villagers rowIndex canAssign isAssignedGroup =
-    div [ HtmlAttr.class "jobVillagerGroup" ]
-        [ p [ HtmlAttr.class "jobVillagerGroupTitle" ]
-            [ text title ]
-        , div [ HtmlAttr.class "jobVillagerList" ]
-            (case villagers of
-                [] ->
-                    [ span [ HtmlAttr.class "jobEmptyState" ]
-                        [ text
-                            (if isAssignedGroup then
-                                "Noch niemand zugewiesen"
-
-                             else
-                                "Keine freien Villager"
-                            )
-                        ]
-                    ]
-
-                _ ->
-                    villagers
-                        |> List.map (jobVillagerChip rowIndex canAssign isAssignedGroup)
-            )
-        ]
-
-
-jobVillagerChip : Int -> Bool -> Bool -> Villager -> Html Msg
-jobVillagerChip rowIndex canAssign isAssignedGroup villager =
-    let
-        buttonLabel =
-            if isAssignedGroup then
-                "Entfernen"
-
-            else
-                "Zuweisen"
-
-        isDisabled =
-            not isAssignedGroup && not canAssign
-    in
-    div [ HtmlAttr.class "jobVillagerChip" ]
-        [ span [ HtmlAttr.class "jobVillagerName" ]
-            [ text ("Villager " ++ String.fromInt villager.id) ]
-        , button
-            [ HtmlAttr.class "jobVillagerButton"
-            , HtmlAttr.classList
-                [ ( "jobVillagerButtonAssigned", isAssignedGroup )
-                , ( "jobVillagerButtonDisabled", isDisabled )
+        , div [ HtmlAttr.class "jobActionRow" ]
+            [ button
+                [ HtmlAttr.class "jobVillagerButton"
+                , HtmlAttr.disabled (freeAdults == 0 || assignedCount >= capacity)
+                , on "click" (Decode.succeed (AssignJobOne rowIndex))
                 ]
-            , HtmlAttr.disabled isDisabled
-            , on "click" (Decode.succeed (ToggleJobAssignment villager.id rowIndex))
+                [ text "+1" ]
+            , button
+                [ HtmlAttr.class "jobVillagerButton jobVillagerButtonAssigned"
+                , HtmlAttr.disabled (assignedCount == 0)
+                , on "click" (Decode.succeed (ClearJob rowIndex))
+                ]
+                [ text "Leeren" ]
             ]
-            [ text buttonLabel ]
         ]
+
+
+freeAdultCount : Model -> Int
+freeAdultCount model =
+    model.statistics.adultsCount - totalAssignedAdults model
+
+
+totalAssignedAdults : Model -> Int
+totalAssignedAdults model =
+    allJobRows
+        |> List.map (\rowIndex -> assignedWorkerCount rowIndex model.jobAssignments)
+        |> List.sum
 
 
 statCard : String -> String -> Html Msg

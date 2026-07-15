@@ -9,7 +9,7 @@ import Json.Encode as Encode
 import List
 import String
 
-import Jobs exposing (allJobRows, jobCapacity, jobEffectForRow)
+import Jobs exposing (allJobRows, assignedWorkerCount, jobCapacity, jobEffectForRow)
 import Model exposing (Model)
 import Msg exposing (LoginResult, Msg(..))
 import Route exposing (fromUrl, shareUrl)
@@ -33,6 +33,7 @@ import Villager exposing
 import Random
 import Constants exposing (gridCellCount, gridColumns, gridRows, ticksPerYear)
 import Villager exposing (deathListGenerator)
+import Utils exposing (tickInYears)
 import Url exposing (Url)
 
 port requestPostgrestToken : { username : String, password : String } -> Cmd msg
@@ -78,6 +79,7 @@ init flags url key =
                 [ { id = 0, x = 80, y = 80, vx = 0.2, vy = 0.1, food = 0, water = 0, age = 18 * ticksPerYear, gender = 0, job = Nothing, isPregnant = False, pregnantDuration = 0 }
                 , { id = 1, x = 150, y = 120, vx = -0.3, vy = 0.5, food = 0, water = 0, age = 18 * ticksPerYear, gender = 1, job = Nothing, isPregnant = False, pregnantDuration = 0 }
                 ]
+            , jobAssignments = List.repeat (List.length allJobRows) 0
             , tick = 0
             , nextVillagerId = 0
             , food = 0
@@ -105,28 +107,41 @@ init flags url key =
 
                     Nothing ->
                         Nothing
+            , authPromptOpen = routeInfo.saveId /= Nothing
             , saveId = routeInfo.saveId
             , savePersisted = False
             , saving = False
-            , loadingSave =
+            , loadingSave = False
+            , persistenceMessage =
                 case routeInfo.saveId of
                     Just _ ->
-                        False
+                        Just "Spielstand aus dem Link wird vorbereitet..."
 
                     Nothing ->
-                        False
-            , persistenceMessage = Nothing
+                        Nothing
             , key = key
             , url = url
             , worldCalculationPending = False
+            , worldCalculationId = 0
             , water = 0
             , waterPerTick = 0
-            , money = 100
+            , money = 0
             , moneyPerTick = 0
             }
+        initialCommand =
+            case routeInfo.saveId of
+                Just saveId ->
+                    if canUsePostgrestModel baseModel then
+                        loadSaveCommand baseModel saveId
+
+                    else
+                        Cmd.none
+
+                Nothing ->
+                    Cmd.none
     in
     ( baseModel
-    , Cmd.none
+    , initialCommand
     )
 
 
@@ -142,32 +157,42 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick delta ->
-            let
-                updatedModel =
-                    updateWorld delta model
+            if model.loadingSave then
+                ( model, Cmd.none )
 
-                worldCommand =
-                    if model.worldCalculationPending then
-                        Cmd.none
+            else
+                let
+                    updatedModel =
+                        updateWorld delta model
 
-                    else
-                        Random.generate WorldCalculated
-                            (worldGenerator updatedModel)
+                    nextWorldCalculationId =
+                        model.worldCalculationId + 1
 
-                nextModel =
-                    if model.worldCalculationPending then
-                        updatedModel
+                    worldCommand =
+                        if model.worldCalculationPending then
+                            Cmd.none
 
-                    else
-                        { updatedModel | worldCalculationPending = True }
-            in
-            ( nextModel
-            , Cmd.batch
-                [ worldCommand
-                , Random.generate NewVillager
-                    (villagerGenerator updatedModel.nextVillagerId)
-                ]
-            )
+                        else
+                            Random.generate (WorldCalculated nextWorldCalculationId)
+                                (worldGenerator updatedModel)
+
+                    nextModel =
+                        if model.worldCalculationPending then
+                            updatedModel
+
+                        else
+                            { updatedModel
+                                | worldCalculationPending = True
+                                , worldCalculationId = nextWorldCalculationId
+                            }
+                in
+                ( nextModel
+                , Cmd.batch
+                    [ worldCommand
+                    , Random.generate NewVillager
+                        (villagerGenerator updatedModel.nextVillagerId)
+                    ]
+                )
 
         FeedVillagers ->
             let
@@ -194,19 +219,23 @@ update msg model =
             ( updatedModel, Cmd.none )
 
 
-        WorldCalculated updatedVillagers ->
-            let
-                diedThisTick =
-                    max 0 (List.length model.villagers - List.length updatedVillagers)
-            in
-            ( { model
-                | villagers = updatedVillagers
-                , deathCount = model.deathCount + diedThisTick
-                , statistics = calculateStatistics updatedVillagers
-                , worldCalculationPending = False
-            }
-            , Cmd.none
-            )
+        WorldCalculated calculationId updatedVillagers ->
+            if model.loadingSave || calculationId /= model.worldCalculationId then
+                ( model, Cmd.none )
+
+            else
+                let
+                    diedThisTick =
+                        max 0 (List.length model.villagers - List.length updatedVillagers)
+                in
+                ( { model
+                    | villagers = updatedVillagers
+                    , deathCount = model.deathCount + diedThisTick
+                    , statistics = calculateStatistics updatedVillagers
+                    , worldCalculationPending = False
+                  }
+                , Cmd.none
+                )
 
         GenNewVillagerValues ->
             ( model
@@ -220,9 +249,6 @@ update msg model =
             }
             , Cmd.none
             )
-
-        ToggleJobAssignment villagerId jobIndex ->
-            ( toggleJobAssignment villagerId jobIndex model, Cmd.none )
 
         LoginUsernameChanged username ->
             ( { model | postgrestUsername = username, authMessage = Nothing }, Cmd.none )
@@ -251,6 +277,9 @@ update msg model =
                     }
                 )
 
+        CloseAuthPrompt ->
+            ( { model | authPromptOpen = False, authMessage = Nothing }, Cmd.none )
+
         PostgrestTokenReceived rawValue ->
             case Decode.decodeValue postgrestTokenDecoder rawValue of
                 Ok loginResult ->
@@ -262,6 +291,7 @@ update msg model =
                                     , postgrestToken = loginResult.token
                                     , postgrestPassword = ""
                                     , authMessage = Just "Angemeldet"
+                                    , authPromptOpen = False
                                 }
                         in
                         case model.saveId of
@@ -291,7 +321,7 @@ update msg model =
 
         SaveRequested ->
             if not (canUsePostgrestModel model) then
-                ( { model | authMessage = Just "Bitte zuerst anmelden" }, Cmd.none )
+                ( { model | authMessage = Just "Bitte zuerst anmelden", authPromptOpen = True }, Cmd.none )
 
             else if model.saving || model.loadingSave then
                 ( model, Cmd.none )
@@ -311,6 +341,29 @@ update msg model =
                   }
                 , saveGameCommand model
                 )
+
+        LoadRequested ->
+            if not (canUsePostgrestModel model) then
+                ( { model | authMessage = Just "Bitte zuerst anmelden", authPromptOpen = True }, Cmd.none )
+
+            else
+                case (fromUrl model.url).saveId of
+                    Just saveId ->
+                        ( { model
+                            | loadingSave = True
+                            , persistenceMessage = Just "Spielstand wird geladen..."
+                          }
+                        , loadSaveCommand model saveId
+                        )
+
+                    Nothing ->
+                        ( { model | persistenceMessage = Just "Kein Spielstand-Link vorhanden" }, Cmd.none )
+
+        AssignJobOne jobIndex ->
+            ( assignOneAdultToJob jobIndex model, Cmd.none )
+
+        ClearJob jobIndex ->
+            ( clearJobAssignments jobIndex model, Cmd.none )
 
         SaveIdGenerated saveId ->
             let
@@ -376,6 +429,7 @@ update msg model =
                                 , savePersisted = True
                                 , loadingSave = False
                                 , persistenceMessage = Just "Spielstand geladen"
+                                , worldCalculationId = model.worldCalculationId + 1
                               }
                             , Cmd.none
                             )
@@ -442,7 +496,35 @@ update msg model =
                         | url = url
                         , saveId = routeInfo.saveId
                         , loadingSave = False
-                        , authMessage = Nothing
+                        , authMessage =
+                            case routeInfo.saveId of
+                                Just _ ->
+                                    if canUsePostgrestModel model then
+                                        Nothing
+
+                                    else
+                                        Just "Bitte anmelden, um den Spielstand zu laden"
+
+                                Nothing ->
+                                    Nothing
+                        , authPromptOpen =
+                            case routeInfo.saveId of
+                                Just _ ->
+                                    not (canUsePostgrestModel model)
+
+                                Nothing ->
+                                    False
+                        , persistenceMessage =
+                            case routeInfo.saveId of
+                                Just _ ->
+                                    if canUsePostgrestModel model then
+                                        Just "Spielstand wird geladen..."
+
+                                    else
+                                        Just "Spielstand aus dem Link wird vorbereitet..."
+
+                                Nothing ->
+                                    model.persistenceMessage
                     }
             in
             case routeInfo.saveId of
@@ -477,7 +559,7 @@ placeBuilding cellIndex buildingIndex model =
                     buildingCost buildingIndex
 
                 canAfford =
-                    model.money >= cost
+                    model.money >= toFloat(cost)
 
                 updatedGrid =
                     setAt cellIndex (Just buildingIndex) model.buildingGrid
@@ -488,7 +570,7 @@ placeBuilding cellIndex buildingIndex model =
                         | buildingGrid = updatedGrid
                         , filledGridRows = filledRowsFromGrid updatedGrid
                         , draggedBuilding = Nothing
-                        , money = model.money - cost
+                        , money = model.money - toFloat(cost)
                     }
 
             else
@@ -520,11 +602,16 @@ filledRowsFromGrid : List (Maybe Int) -> List Int
 filledRowsFromGrid buildingGrid =
     List.range 0 (gridRows - 1)
         |> List.map
-            (\rowIndex ->
+            (\buildingIndex ->
                 buildingGrid
-                    |> List.drop (rowIndex * gridColumns)
-                    |> List.take gridColumns
-                    |> List.filterMap identity
+                    |> List.filterMap
+                        (\cell ->
+                            if cell == Just buildingIndex then
+                                Just buildingIndex
+
+                            else
+                                Nothing
+                        )
                     |> List.length
             )
 
@@ -580,14 +667,58 @@ updateWorld delta model =
 
 refreshDerivedFields : Model -> Model
 refreshDerivedFields model =
-    { model
-        | filledGridRows = filledRowsFromGrid model.buildingGrid
-        , statistics = calculateStatistics model.villagers
-        , foodPerTick = calculateFoodPerTick model
-        , waterPerTick = calculateWaterPerTick model
-        , moneyPerTick = calculateMoneyPerTick model
-        , worldCalculationPending = False
+    let
+        filledGridRows =
+            filledRowsFromGrid model.buildingGrid
+
+        statistics =
+            calculateStatistics model.villagers
+
+        normalizedJobAssignments =
+            normalizeJobAssignments filledGridRows statistics.adultsCount model.jobAssignments
+
+        refreshedModel =
+            { model
+                | filledGridRows = filledGridRows
+                , statistics = statistics
+                , jobAssignments = normalizedJobAssignments
+                , worldCalculationPending = False
+            }
+    in
+    { refreshedModel
+        | foodPerTick = calculateFoodPerTick refreshedModel
+        , waterPerTick = calculateWaterPerTick refreshedModel
+        , moneyPerTick = calculateMoneyPerTick refreshedModel
     }
+
+
+adultVillager : Villager -> Bool
+adultVillager villager =
+    tickInYears villager.age >= 18
+
+
+freeAdultVillagers : Model -> Int
+freeAdultVillagers model =
+    max 0 (model.statistics.adultsCount - totalAssignedAdults model)
+
+
+assignOneAdultToJob : Int -> Model -> Model
+assignOneAdultToJob jobIndex model =
+    if freeAdultVillagers model <= 0 then
+        refreshDerivedFields model
+
+    else
+        refreshDerivedFields
+            { model
+                | jobAssignments =
+                    updateJobAssignmentAt jobIndex ((+) 1) model.jobAssignments
+            }
+
+
+clearJobAssignments : Int -> Model -> Model
+clearJobAssignments jobIndex model =
+    refreshDerivedFields
+        { model | jobAssignments = updateJobAssignmentAt jobIndex (\_ -> 0) model.jobAssignments }
 
 feedOneRound : Int -> List Villager -> ( Int, List Villager )
 feedOneRound availableFood villagers =
@@ -644,11 +775,11 @@ calculateWaterPerTick model =
         + (jobBonusField .water model)
 
 
-calculateMoneyPerTick : Model -> Int
+calculateMoneyPerTick : Model -> Float
 calculateMoneyPerTick model =
-    List.length model.villagers
-        + (buildingCount 3 model * 10)
-        + (jobBonusField .money model)
+    toFloat(List.length model.villagers) * 1
+        + toFloat(buildingCount 3 model * 10)
+        + toFloat(jobBonusField .money model)
 
 
 lifeExpectancyBonusYears : Model -> Int
@@ -715,10 +846,7 @@ jobBonuses model =
                         jobCapacity rowIndex model.filledGridRows
 
                     workers =
-                        model.villagers
-                            |> List.filter (\villager -> villager.job == Just rowIndex)
-                            |> List.take capacity
-                            |> List.length
+                        min capacity (assignedWorkerCount rowIndex model.jobAssignments)
 
                     effect =
                         jobEffectForRow rowIndex
@@ -732,40 +860,61 @@ jobBonuses model =
             { food = 0, water = 0, money = 0, lifeExpectancy = 0 }
 
 
+totalAssignedAdults : Model -> Int
+totalAssignedAdults model =
+    model.jobAssignments
+        |> List.sum
+
+
+updateJobAssignmentAt : Int -> (Int -> Int) -> List Int -> List Int
+updateJobAssignmentAt targetIndex updateCount jobAssignments =
+    jobAssignments
+        |> List.indexedMap
+            (\index count ->
+                if index == targetIndex then
+                    max 0 (updateCount count)
+
+                else
+                    count
+            )
+
+
+normalizeJobAssignments : List Int -> Int -> List Int -> List Int
+normalizeJobAssignments filledGridRows adultsCount requestedAssignments =
+    let
+        requestedWithDefaults =
+            List.range 0 (List.length allJobRows - 1)
+                |> List.map
+                    (\rowIndex ->
+                        requestedAssignments
+                            |> List.drop rowIndex
+                            |> List.head
+                            |> Maybe.withDefault 0
+                    )
+
+        step rowIndex requested ( remainingAdults, normalizedAssignments ) =
+            let
+                capacity =
+                    jobCapacity rowIndex filledGridRows
+
+                assigned =
+                    min requested (min capacity remainingAdults)
+            in
+            ( remainingAdults - assigned, normalizedAssignments ++ [ assigned ] )
+    in
+    requestedWithDefaults
+        |> List.indexedMap Tuple.pair
+        |> List.foldl
+            (\( rowIndex, requested ) acc ->
+                step rowIndex requested acc
+            )
+            ( max 0 adultsCount, [] )
+        |> Tuple.second
+
+
 jobBonusField : (JobBonuses -> Int) -> Model -> Int
 jobBonusField field model =
     field (jobBonuses model)
-
-
-toggleJobAssignment : Int -> Int -> Model -> Model
-toggleJobAssignment villagerId jobIndex model =
-    let
-        capacity =
-            jobCapacity jobIndex model.filledGridRows
-
-        currentAssignedCount =
-            model.villagers
-                |> List.filter (\villager -> villager.job == Just jobIndex)
-                |> List.length
-
-        assignable =
-            currentAssignedCount < capacity
-
-        updateVillager villager =
-            if villager.id /= villagerId then
-                villager
-
-            else if villager.job == Just jobIndex then
-                { villager | job = Nothing }
-
-            else if assignable then
-                { villager | job = Just jobIndex }
-
-            else
-                villager
-    in
-    refreshDerivedFields
-        { model | villagers = List.map updateVillager model.villagers }
 
 
 loadSaveCommand : Model -> String -> Cmd Msg
