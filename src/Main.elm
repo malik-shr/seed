@@ -777,7 +777,7 @@ calculateWaterPerTick model =
 
 calculateMoneyPerTick : Model -> Float
 calculateMoneyPerTick model =
-    toFloat(List.length model.villagers) * 1
+    toFloat(List.length model.villagers) * 0.0001
         + toFloat(buildingCount 3 model * 10)
         + toFloat(jobBonusField .money model)
 
