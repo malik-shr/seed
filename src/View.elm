@@ -1,18 +1,18 @@
-module View exposing (view, sidebarContent)
+module View exposing (sidebarContent, view)
 
 import Constants exposing (gridCellCount, gridCellHeight, gridCellWidth, gridColumns, gridRows)
-import Html exposing (Html, a, button, div, p, span, text)
+import Html exposing (Html, a, button, div, img, p, span, text)
 import Html.Attributes as HtmlAttr
 import Html.Events exposing (custom, on)
 import Json.Decode as Decode
+import List exposing (length)
 import Model exposing (Model, SidebarTab(..))
 import Msg exposing (Msg(..))
 import Svg exposing (Svg, g, image, rect, svg)
 import Svg.Attributes as SvgAttr
+import Url
 import Utils exposing (numberToMonth, tickInYears)
 import Villager exposing (viewVillager)
-import Url
-import List exposing (length)
 
 
 view : Model -> Html Msg
@@ -237,7 +237,8 @@ populationLevelInfo population =
                 1
 
             else
-                clamp 0 1
+                clamp 0
+                    1
                     (toFloat (population - currentThreshold) / toFloat progressRange)
     in
     { population = population
@@ -299,10 +300,13 @@ sidebarTabUrl tab =
     case tab of
         StatisticsTab ->
             "/statistics"
+
         ProductionTab ->
             "/production"
+
         JobsTab ->
             "/jobs"
+
         BuildingsTab ->
             "/buildings"
 
@@ -354,7 +358,6 @@ sidebarContent model =
                     )
                 ]
 
-        
         JobsTab ->
             div [ HtmlAttr.class "housesPanel", HtmlAttr.attribute "role" "tabpanel" ]
                 [ p [ HtmlAttr.class "panelTitle" ] [ text "Gebäude bauen" ]
@@ -372,13 +375,15 @@ tabFromUrl url =
     case url.path of
         "/buildings" ->
             BuildingsTab
+
         "/production" ->
             ProductionTab
+
         "/jobs" ->
             JobsTab
+
         _ ->
             StatisticsTab
-
 
 
 buildingImage : Model -> Int -> String
@@ -397,7 +402,16 @@ rowFillButton model rowIndex =
         , on "dragstart" (Decode.succeed (StartDraggingBuilding rowIndex))
         , on "dragend" (Decode.succeed StopDraggingBuilding)
         ]
-        [ text (rowName rowIndex) ]
+        [ img
+            [ HtmlAttr.class "buildingButtonPreview"
+            , HtmlAttr.src (buildingImage model rowIndex)
+            , HtmlAttr.alt ""
+            , HtmlAttr.attribute "draggable" "false"
+            ]
+            []
+        , span [ HtmlAttr.class "buildingButtonLabel" ]
+            [ text (rowName rowIndex) ]
+        ]
 
 
 rowName : Int -> String
@@ -446,7 +460,8 @@ resourceRow label productionValue demandValue isSurplus =
     div [ HtmlAttr.class "resourceRow" ]
         [ p [ HtmlAttr.class "resourceRowTitle" ] [ text label ]
         , div [ HtmlAttr.class "resourceRowGrid" ]
-            [ resourceMetric "Produktion" productionValue
+            [ resourceMetric "Produktion"
+                productionValue
                 isSurplus
             , demandMetric "Bedarf" demandValue
             ]
