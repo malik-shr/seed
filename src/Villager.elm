@@ -33,6 +33,7 @@ type alias Villager =
     , food : Int
     , water : Int
     , gender : Int 
+    , job : Maybe Int
     , isPregnant : Bool
     , pregnantDuration : Int 
     }
@@ -128,6 +129,7 @@ villagerGenerator id =
             , food = 0
             , water = 0
             , gender = gender
+            , job = Nothing
             , isPregnant = False
             , pregnantDuration = 0
             }
