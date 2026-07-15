@@ -1,4 +1,4 @@
-module View exposing (view, sidebarContent)
+module View exposing (sidebarContent, view)
 
 import Constants exposing (gridCellCount, gridCellHeight, gridCellWidth, gridColumns, gridRows)
 import Jobs exposing (allJobRows, assignedWorkerCount, jobCapacity, jobEffectSummary, jobName)
@@ -6,12 +6,14 @@ import Html exposing (Html, a, button, div, input, p, span, text)
 import Html.Attributes as HtmlAttr
 import Html.Events exposing (custom, on, onInput)
 import Json.Decode as Decode
+import List exposing (length)
 import Model exposing (Model, SidebarTab(..))
 import Msg exposing (Msg(..))
 import Route exposing (shareUrl)
 import Villager exposing (Villager, viewVillager)
 import Svg exposing (Svg, g, image, rect, svg)
 import Svg.Attributes as SvgAttr
+import Url
 import Utils exposing (numberToMonth, tickInYears)
 import List
 
@@ -349,7 +351,8 @@ populationLevelInfo population =
                 1
 
             else
-                clamp 0 1
+                clamp 0
+                    1
                     (toFloat (population - currentThreshold) / toFloat progressRange)
     in
     { population = population
@@ -484,7 +487,16 @@ rowFillButton model rowIndex =
         , on "dragstart" (Decode.succeed (StartDraggingBuilding rowIndex))
         , on "dragend" (Decode.succeed StopDraggingBuilding)
         ]
-        [ text (rowName rowIndex) ]
+        [ img
+            [ HtmlAttr.class "buildingButtonPreview"
+            , HtmlAttr.src (buildingImage model rowIndex)
+            , HtmlAttr.alt ""
+            , HtmlAttr.attribute "draggable" "false"
+            ]
+            []
+        , span [ HtmlAttr.class "buildingButtonLabel" ]
+            [ text (rowName rowIndex) ]
+        ]
 
 
 rowName : Int -> String
@@ -630,7 +642,8 @@ resourceRow label productionValue demandValue isSurplus =
     div [ HtmlAttr.class "resourceRow" ]
         [ p [ HtmlAttr.class "resourceRowTitle" ] [ text label ]
         , div [ HtmlAttr.class "resourceRowGrid" ]
-            [ resourceMetric "Produktion" productionValue
+            [ resourceMetric "Produktion"
+                productionValue
                 isSurplus
             , demandMetric "Bedarf" demandValue
             ]
