@@ -7,6 +7,7 @@ module Route exposing
 
 import Model exposing (SidebarTab(..))
 import List
+import String
 import Url exposing (Url)
 
 
@@ -20,10 +21,9 @@ fromUrl : Url -> RouteInfo
 fromUrl url =
     let
         segments =
-            url.path
+            routeSegments url
                 |> String.split "/"
                 |> List.filter (\segment -> segment /= "")
-                |> stripAppPrefix
     in
     case segments of
         "s" :: saveId :: tabSegment :: _ ->
@@ -41,7 +41,7 @@ fromUrl url =
             , tab = tabFromSegment tabSegment
             }
 
-        [] ->
+        _ ->
             { saveId = Nothing
             , tab = StatisticsTab
             }
@@ -51,30 +51,53 @@ sidebarTabPath : Maybe String -> SidebarTab -> String
 sidebarTabPath saveId tab =
     case saveId of
         Just savedId ->
-            case tab of
-                StatisticsTab ->
-                    "/s/" ++ savedId
-
-                _ ->
-                    "/s/" ++ savedId ++ "/" ++ tabToSegment tab
+            "/s/" ++ savedId ++ sidebarTabSuffix tab
 
         Nothing ->
-            "/" ++ tabToSegment tab
+            case tab of
+                StatisticsTab ->
+                    "/"
+
+                _ ->
+                    "/" ++ tabToSegment tab
 
 
 shareUrl : String -> Maybe String -> SidebarTab -> String
 shareUrl appBaseUrl saveId tab =
-    appBaseUrl ++ sidebarTabPath saveId tab
+    appBaseUrl ++ "/#" ++ sidebarTabPath saveId tab
 
 
-stripAppPrefix : List String -> List String
+sidebarTabSuffix : SidebarTab -> String
+sidebarTabSuffix tab =
+    case tab of
+        StatisticsTab ->
+            ""
+
+        _ ->
+            "/" ++ tabToSegment tab
+
+
+routeSegments : Url -> String
+routeSegments url =
+    case url.fragment of
+        Just fragment ->
+            fragment
+
+        Nothing ->
+            url.path
+                |> String.split "/"
+                |> List.filter (\segment -> segment /= "")
+                |> stripAppPrefix
+
+
+stripAppPrefix : List String -> String
 stripAppPrefix segments =
     case segments of
         "seed" :: rest ->
-            rest
+            String.join "/" rest
 
         _ ->
-            segments
+            String.join "/" segments
 
 
 tabFromSegment : String -> SidebarTab
